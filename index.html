@@ -242,13 +242,28 @@ input[type=range] { accent-color: var(--prod); width: 110px; }
 .cpu-tl i { background: var(--surface-2); border-radius: 2px; }
 .cpu-foot { display: flex; justify-content: space-between; gap: 8px; font-size: 10.5px; color: var(--muted); margin-top: 4px; }
 
-.lock { --lk: var(--bad); display: grid; grid-template-columns: 40px 1fr; gap: 2px 12px; align-items: center; background: var(--surface); border: 2px solid var(--lk); border-radius: 14px; padding: 10px 12px; transition: border-color .25s; }
-.lock.open { --lk: var(--ok); }
-.padlock { width: 40px; height: 48px; grid-row: span 2; overflow: visible; }
-.padlock .shackle { stroke: var(--lk); transition: transform .3s, stroke .25s; }
+.lock {
+  --lk: var(--bad); --lk-soft: var(--bad-soft);
+  display: grid; grid-template-columns: 72px 1fr; gap: 2px 14px; align-items: center;
+  background: var(--surface); border: 2px solid var(--lk); border-radius: 14px; padding: 12px 14px;
+  transition: border-color .25s;
+}
+.lock.open { --lk: var(--ok); --lk-soft: var(--ok-soft); }
+.lk-art { grid-row: span 2; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.padlock { width: 58px; height: 72px; overflow: visible; }
+.padlock .shackle { stroke: var(--muted); transition: transform .4s cubic-bezier(.3,1.6,.5,1); }
 .padlock .body { fill: var(--lk); transition: fill .25s; }
 .padlock .hole { fill: var(--surface); }
-.lock.open .shackle { transform: translateY(-7px); }
+.padlock .shine { fill: #fff; opacity: .18; }
+/* unlocked: shackle pops up and its short (left) leg comes out of the body */
+.lock.open .shackle { transform: translateY(-15px); }
+.lk-state { font: 800 10px Inter, sans-serif; letter-spacing: .09em; color: var(--lk); background: var(--lk-soft); padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+.lock.shake .padlock { animation: lkshake .5s; }
+.lock.pop .padlock { animation: lkpop .45s; }
+@keyframes lkshake { 0%, 100% { transform: none; } 20% { transform: translateX(-4px) rotate(-7deg); } 40% { transform: translateX(4px) rotate(7deg); } 60% { transform: translateX(-3px) rotate(-4deg); } 80% { transform: translateX(2px); } }
+@keyframes lkpop { 0%, 100% { transform: none; } 40% { transform: scale(1.14); } }
+.mini-lock { width: 10px; height: 12px; vertical-align: -1px; fill: currentColor; }
+.mini-lock path { fill: none; stroke: currentColor; stroke-width: 9; }
 .lk-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 .lk-name { font: 700 13px "JetBrains Mono", monospace; }
 .lk-val { font: 800 24px/1 "JetBrains Mono", monospace; color: var(--lk); }
@@ -375,6 +390,7 @@ footer { padding: 40px 0 60px; color: var(--muted); font-size: 14px; border-top:
   .theme-btn { margin-left: auto; }
 }
 @media (prefers-reduced-motion: reduce) {
+  .lock.shake .padlock, .lock.pop .padlock { animation: none; }
   html { scroll-behavior: auto; }
   .court .ball, .meter i { transition: none; }
 }
@@ -413,7 +429,7 @@ footer { padding: 40px 0 60px; color: var(--muted); font-size: 14px; border-top:
 <div class="wrap">
   <div class="sec-num">00 · How to read the demos</div>
   <h2>A semaphore is a counter with a waiting line</h2>
-  <p class="sub">Every demo is laid out the same way. The <b>CPU</b> runs one thread at a time and shows the line it just executed. Each <b>thread</b> has a card with its own code: <b>▶</b> marks its next line (its program counter), <b>■</b> means it is blocked, and <b>z</b> means it is sleeping. Each <b>semaphore</b> is drawn as a padlock that is green and open while its value is above 0, red and shut at 0, with the threads blocked on it listed underneath. Threads that are not on the CPU wait in the ready queue, in a lock's queue, or asleep.</p>
+  <p class="sub">Every demo is laid out the same way. The <b>CPU</b> runs one thread at a time and shows the line it just executed. Each <b>thread</b> has a card with its own code: <b>▶</b> marks its next line (its program counter), a small lock means it is blocked on a semaphore, and <b>z</b> means it is sleeping. Each <b>semaphore</b> is drawn as a padlock: <b style="color:var(--ok)">unlocked</b> (green, shackle open) while its value is above 0, so <code>sem_wait</code> passes, and <b style="color:var(--bad)">locked</b> (red, shackle shut) at 0, so <code>sem_wait</code> blocks, with the threads blocked on it listed underneath. Threads that are not on the CPU wait in the ready queue, in a lock's queue, or asleep.</p>
   <div class="grid2">
     <div class="panel">
       <h3>The two operations</h3>
@@ -708,10 +724,14 @@ const TEMPLATE = `
   <div class="extra"></div>
 </div>`;
 
-const PADLOCK = `<svg class="padlock" viewBox="0 0 40 48" aria-hidden="true">
-  <path class="shackle" d="M11 23 V15 a9 9 0 0 1 18 0 V23" fill="none" stroke-width="5" stroke-linecap="round"/>
-  <rect class="body" x="4" y="22" width="32" height="24" rx="6"/>
-  <circle class="hole" cx="20" cy="32" r="3.5"/><rect class="hole" x="18.5" y="33" width="3" height="7" rx="1.5"/></svg>`;
+/* the right leg of the shackle runs down behind the body, so lifting the shackle
+   frees only the left leg, like a real open padlock */
+const PADLOCK = `<svg class="padlock" viewBox="0 0 64 80" aria-hidden="true">
+  <path class="shackle" d="M19 40 V25 a13 13 0 0 1 26 0 V72" fill="none" stroke-width="8" stroke-linecap="round"/>
+  <rect class="body" x="5" y="36" width="54" height="42" rx="10"/>
+  <rect class="shine" x="10" y="40" width="44" height="7" rx="3.5"/>
+  <circle class="hole" cx="32" cy="54" r="6"/><rect class="hole" x="29" y="56" width="6" height="13" rx="3"/></svg>`;
+const MINI_LOCK = `<svg class="mini-lock" viewBox="0 0 64 80" aria-hidden="true"><path d="M19 40 V25 a13 13 0 0 1 26 0 V40"/><rect x="5" y="36" width="54" height="42" rx="10"/></svg>`;
 
 const STATE_TXT = th => th.state === 'blocked' ? `blocked on ${th.blockedOn}`
   : th.state === 'sleep' ? 'sleeping' : th.state;
@@ -739,6 +759,7 @@ function fly(from, to, th) {
   }));
   setTimeout(() => g.remove(), 800);
 }
+function replay(el, cls) { el.classList.remove('shake', 'pop'); void el.offsetWidth; el.classList.add(cls); }
 /* the auto scheduler keeps the current thread half the time, otherwise picks any ready thread */
 const schedPick = (ready, S) => S.onCpu && ready.includes(S.onCpu) && Math.random() < 0.5 ? S.onCpu : ready[Math.random() * ready.length | 0];
 
@@ -795,12 +816,12 @@ function mountDemo(def) {
     if (!names.length) locks.innerHTML = '<div class="lock none">No semaphores in this version, so nothing ever stops a thread.</div>';
     names.forEach(n => {
       const el = document.createElement('div'); el.className = 'lock';
-      el.innerHTML = `${PADLOCK}<div class="lk-top"><span class="lk-name">${n}</span><span class="lk-val"></span></div>
+      el.innerHTML = `<div class="lk-art">${PADLOCK}<span class="lk-state"></span></div><div class="lk-top"><span class="lk-name">${n}</span><span class="lk-val"></span></div>
         <div><div class="lk-tokens"></div><div class="lk-init mono">sem_init(&amp;${n}, 0, ${S.sems[n].init})</div></div>
         ${def.holders ? `<div class="lk-row"><span>${def.holders}</span><div class="qchips hold"></div></div>` : ''}
         <div class="lk-row"><span>Blocked</span><div class="qchips wq"></div></div>`;
       locks.appendChild(el);
-      lockEls[n] = { el, val: el.querySelector('.lk-val'), tok: el.querySelector('.lk-tokens'), hold: el.querySelector('.hold'), wq: el.querySelector('.wq') };
+      lockEls[n] = { el, open: null, state: el.querySelector('.lk-state'), val: el.querySelector('.lk-val'), tok: el.querySelector('.lk-tokens'), hold: el.querySelector('.hold'), wq: el.querySelector('.wq') };
     });
 
     cards = S.threads.map(th => {
@@ -893,7 +914,13 @@ function mountDemo(def) {
     /* locks */
     for (const n in lockEls) {
       const s = S.sems[n], L = lockEls[n];
-      L.el.classList.toggle('open', s.v > 0);
+      const open = s.v > 0;
+      L.el.classList.toggle('open', open);
+      L.state.textContent = open ? (s.v > 1 ? `UNLOCKED · ${s.v} free` : 'UNLOCKED') : 'LOCKED';
+      L.el.title = open ? `${n} = ${s.v}: sem_wait will pass` : `${n} = 0: sem_wait will block`;
+      if (animate && L.open !== null && L.open !== open) replay(L.el, 'pop');
+      if (animate && S.ev && S.ev.k === 'block' && S.ev.sem === n) replay(L.el, 'shake');
+      L.open = open;
       L.val.textContent = s.v;
       L.tok.innerHTML = '<i></i>'.repeat(Math.min(s.v, 12));
       if (L.hold) L.hold.innerHTML = s.holders.length ? s.holders.map(t => qchip(t)).join('') : '<span class="qnone">nobody</span>';
@@ -906,13 +933,13 @@ function mountDemo(def) {
       c.el.classList.toggle('oncpu', th === run);
       c.el.classList.toggle('done', th.state === 'done');
       c.st.className = 'st ' + (th === run ? 'running' : th.state);
-      c.st.textContent = th === run ? 'on CPU' : STATE_TXT(th);
+      c.st.innerHTML = th === run ? 'on CPU' : (th.state === 'blocked' ? MINI_LOCK + ' ' : '') + STATE_TXT(th);
       c.btn.disabled = !live || th.state !== 'ready';
       for (const ln in c.lineEl) { const x = c.lineEl[ln]; x.classList.remove('cur', 'blocked', 'ran'); x.firstChild.textContent = ''; }
       if (th.state !== 'done') {
         const x = c.lineEl[th.prog[th.pc].line];
         x.classList.add('cur'); if (th.state === 'blocked') x.classList.add('blocked');
-        x.firstChild.textContent = th.state === 'blocked' ? '■' : th.state === 'sleep' ? 'z' : '▶';
+        x.firstChild.innerHTML = th.state === 'blocked' ? MINI_LOCK : th.state === 'sleep' ? 'z' : '▶';
       }
       if (S.last && S.last.th === th && c.lineEl[S.last.line]) c.lineEl[S.last.line].classList.add('ran');
       c.ctx.textContent = th.state === 'done' ? 'finished' : th === run ? 'context loaded in the CPU' : 'saved context: ' + ctxStr(th);
