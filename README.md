@@ -6,7 +6,7 @@ An interactive, step-by-step visualization of five classic **POSIX semaphore** p
 
 ## What's inside
 
-Each program runs in a small thread simulator. Press **Run** to let a random scheduler choose, or click a thread's chip in the code to schedule it yourself. Semaphore values, wait queues, thread states and `stdout` update after every atomic step. Every demo also has a broken mode that shows what the semaphore prevents.
+Each program runs on a simulated single CPU. The page shows the CPU (the running thread, the line it is executing, its registers, the ready queue, sleeping threads, a history of who ran each step and a count of context switches), one card per thread with its own code and program counter, and each semaphore drawn as a padlock with its value, the threads holding it and the threads blocked on it. Press **Run** to let the scheduler decide, or press a thread's button to schedule it yourself. Every demo also has a broken mode that shows what the semaphore prevents.
 
 | # | Program | Pattern | Broken modes |
 |---|---------|---------|--------------|

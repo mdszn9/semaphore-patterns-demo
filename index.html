@@ -90,7 +90,8 @@ body {
   font: 16px/1.6 Inter, system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
-code, pre, .mono { font-family: "JetBrains Mono", ui-monospace, Menlo, monospace; }
+code, pre, .mono { font-family: "JetBrains Mono", ui-monospace, Menlo, monospace; font-variant-ligatures: none; }
+.tl .src, .cpu-ins, .lk-name, .lk-val, .sem-val { font-variant-ligatures: none; }
 a { color: var(--prod); }
 .wrap { max-width: 1120px; margin: 0 auto; padding: 0 16px; }
 
@@ -193,50 +194,96 @@ input[type=range] { accent-color: var(--prod); width: 110px; }
 .verdict.warn { background: var(--warn-soft); color: var(--warn); }
 .verdict.pending { background: var(--surface-2); color: var(--muted); }
 .stage { background: var(--surface-2); border-radius: 14px; padding: 16px; min-height: 120px; }
-.dgrid { display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; margin-top: 16px; }
-.dgrid > * { min-width: 0; }
 .lbl { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; margin: 0 0 6px; }
 .lbl.gap { margin-top: 14px; }
-
-.codebox { background: var(--code-bg); border: 1px solid var(--border); border-radius: 12px; padding: 8px 6px; overflow-x: auto; }
-.ln { display: grid; grid-template-columns: 96px 22px max-content; align-items: center; min-height: 28px; border-radius: 6px; padding: 1px 6px 1px 0; }
-.ln.flash { background: color-mix(in srgb, var(--warn) 16%, transparent); }
-.ln .chips { display: flex; flex-wrap: wrap; gap: 3px; justify-content: flex-end; padding-right: 8px; }
-.ln .no { color: var(--muted); font: 11px "JetBrains Mono", monospace; opacity: .7; }
-.ln .src { white-space: pre; font: 13px/1.6 "JetBrains Mono", monospace; }
-.ln.off .src { text-decoration: line-through; opacity: .45; }
-
-.chip {
-  --c: var(--t0);
-  font: 700 11px Inter, sans-serif; color: var(--on-c); background: var(--c); border: 2px solid var(--c);
-  padding: 1px 7px; border-radius: 999px; cursor: pointer; white-space: nowrap; line-height: 1.4;
-}
-.chip:disabled { cursor: default; }
-.chip.blocked { background: transparent; color: var(--c); border-style: dashed; }
-.chip.sleep { opacity: .55; }
-.chip.last { box-shadow: 0 0 0 3px color-mix(in srgb, var(--c) 35%, transparent); }
-.chip.ready:not(:disabled):hover { filter: brightness(1.1); transform: translateY(-1px); }
-
-.sems { display: flex; flex-wrap: wrap; gap: 8px; }
-.sem { flex: 1 1 140px; border: 2px solid var(--mem); background: var(--mem-soft); border-radius: 12px; padding: 8px 12px; }
-.sem-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-.sem-name { font: 600 12px "JetBrains Mono", monospace; color: var(--mem); }
-.sem-val { font: 800 26px/1.1 "JetBrains Mono", monospace; }
-.sem-q { font-size: 12px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-top: 4px; min-height: 22px; }
-.tag { --c: var(--t0); font: 700 11px Inter, sans-serif; border: 2px dashed var(--c); color: var(--c); border-radius: 999px; padding: 0 7px; }
-.empty { font-size: 13px; color: var(--muted); padding: 10px 12px; border: 1px dashed var(--border); border-radius: 10px; }
-
-.threads { display: flex; flex-direction: column; gap: 4px; }
-.trow { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 9px; border: 1px solid var(--border); background: var(--surface); font-size: 13px; }
-.trow.last { border-color: var(--c); box-shadow: 0 0 0 2px color-mix(in srgb, var(--c) 25%, transparent); }
 .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--c); flex: none; }
-.trow b { white-space: nowrap; }
 .st { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px; background: var(--surface-2); color: var(--muted); white-space: nowrap; }
 .st.ready { color: var(--ok); background: var(--ok-soft); }
 .st.blocked { color: var(--bad); background: var(--bad-soft); }
 .st.sleep { color: var(--warn); background: var(--warn-soft); }
-.regs { font-size: 11.5px; color: var(--muted); white-space: nowrap; }
-.trow .btn { margin-left: auto; }
+.st.running { color: var(--on-c); background: var(--c); }
+
+/* machine: CPU + locks + thread cards */
+.machine { display: grid; gap: 14px; margin-top: 4px; align-items: start; }
+.machine.two { grid-template-columns: 1fr minmax(250px, 290px) 1fr; }
+.machine.many { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+.machine > * { min-width: 0; }
+.kernel { display: flex; flex-direction: column; gap: 12px; }
+.machine.many .kernel { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(250px, 330px) 1fr; align-items: start; }
+.locks { display: flex; flex-direction: column; gap: 10px; }
+
+.cpu-card { position: relative; background: var(--surface); border: 2px solid var(--text); border-radius: 14px; padding: 12px 14px; margin: 0 10px; box-shadow: var(--shadow); }
+.cpu-card::before, .cpu-card::after {
+  content: ""; position: absolute; top: 20px; bottom: 20px; width: 8px;
+  background: repeating-linear-gradient(to bottom, var(--muted) 0 4px, transparent 4px 11px);
+}
+.cpu-card::before { left: -11px; } .cpu-card::after { right: -11px; }
+.cpu-head { display: flex; justify-content: space-between; align-items: center; }
+.cpu-label { font: 800 13px "JetBrains Mono", monospace; letter-spacing: .14em; }
+.cpu-clock { font-size: 11px; color: var(--muted); }
+.cpu-slot {
+  margin: 10px 0 8px; min-height: 48px; padding: 6px; border-radius: 10px; border: 2px dashed var(--border);
+  display: grid; place-items: center; text-align: center; font-weight: 600; color: var(--muted); font-size: 13px;
+  transition: background .2s, border-color .2s;
+}
+.cpu-slot.busy { border-style: solid; border-color: var(--c); background: color-mix(in srgb, var(--c) 15%, transparent); color: var(--text); }
+.cpu-slot .big { font-size: 17px; font-weight: 800; color: var(--c); }
+.cpu-ins { font-size: 12px; background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px; white-space: pre; overflow: hidden; text-overflow: ellipsis; }
+.cpu-ins span.k { color: var(--muted); }
+.cpu-regs { font-size: 11.5px; color: var(--muted); margin-top: 6px; min-height: 17px; }
+.cpu-row { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 12px; color: var(--muted); flex-wrap: wrap; min-height: 22px; }
+.cpu-row > span:first-child, .lk-row > span:first-child { font-weight: 700; text-transform: uppercase; letter-spacing: .06em; font-size: 10.5px; width: 84px; flex: none; }
+.qchips { display: flex; gap: 4px; flex-wrap: wrap; }
+.qchip { --c: var(--t0); font: 700 11px Inter, sans-serif; background: var(--c); color: var(--on-c); padding: 1px 8px; border-radius: 999px; border: 2px solid var(--c); white-space: nowrap; }
+.qchip.wait { background: transparent; color: var(--c); border-style: dashed; }
+.qchip.sleep { opacity: .55; }
+.qnone { font-style: italic; font-size: 12px; }
+.cpu-tl { display: grid; grid-template-columns: repeat(40, 1fr); gap: 1px; margin-top: 10px; height: 14px; }
+.cpu-tl i { background: var(--surface-2); border-radius: 2px; }
+.cpu-foot { display: flex; justify-content: space-between; gap: 8px; font-size: 10.5px; color: var(--muted); margin-top: 4px; }
+
+.lock { --lk: var(--bad); display: grid; grid-template-columns: 40px 1fr; gap: 2px 12px; align-items: center; background: var(--surface); border: 2px solid var(--lk); border-radius: 14px; padding: 10px 12px; transition: border-color .25s; }
+.lock.open { --lk: var(--ok); }
+.padlock { width: 40px; height: 48px; grid-row: span 2; overflow: visible; }
+.padlock .shackle { stroke: var(--lk); transition: transform .3s, stroke .25s; }
+.padlock .body { fill: var(--lk); transition: fill .25s; }
+.padlock .hole { fill: var(--surface); }
+.lock.open .shackle { transform: translateY(-7px); }
+.lk-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.lk-name { font: 700 13px "JetBrains Mono", monospace; }
+.lk-val { font: 800 24px/1 "JetBrains Mono", monospace; color: var(--lk); }
+.lk-tokens { display: flex; gap: 3px; flex-wrap: wrap; min-height: 10px; margin-bottom: 2px; }
+.lk-tokens i { width: 10px; height: 10px; border-radius: 50%; background: var(--ok); }
+.lk-init { font-size: 11px; color: var(--muted); }
+.lk-row { grid-column: 1 / -1; display: flex; gap: 6px; align-items: center; font-size: 12px; color: var(--muted); flex-wrap: wrap; min-height: 24px; margin-top: 4px; }
+.lock.none { --lk: var(--border); display: block; color: var(--muted); font-size: 13px; border-style: dashed; }
+
+.tcard { --c: var(--t0); background: var(--surface); border: 2px solid var(--border); border-radius: 14px; overflow: hidden; transition: border-color .2s, box-shadow .2s, opacity .2s; }
+.tcard.oncpu { border-color: var(--c); box-shadow: 0 0 0 4px color-mix(in srgb, var(--c) 22%, transparent); }
+.tcard.done { opacity: .6; }
+.tc-head { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-bottom: 1px solid var(--border); background: color-mix(in srgb, var(--c) 10%, var(--surface)); flex-wrap: wrap; }
+.tc-head b { white-space: nowrap; color: var(--c); }
+.tc-head .btn { margin-left: auto; }
+.tc-code { padding: 6px 0; overflow-x: auto; background: var(--code-bg); }
+.tl { display: grid; grid-template-columns: 20px 20px max-content; align-items: center; min-height: 23px; padding-right: 10px; }
+.tl .pc { text-align: center; color: var(--c); font-size: 11px; font-weight: 800; }
+.tl .no { color: var(--muted); font: 10.5px "JetBrains Mono", monospace; opacity: .7; }
+.tl .src { white-space: pre; font: 12.5px/1.55 "JetBrains Mono", monospace; }
+.tl.off .src { text-decoration: line-through; opacity: .45; }
+.tl.cur { background: color-mix(in srgb, var(--c) 18%, transparent); }
+.tl.cur.blocked { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--bad) 16%, transparent) 0 6px, transparent 6px 12px); }
+.tl.cur.blocked .pc { color: var(--bad); }
+.tl.ran { box-shadow: inset 3px 0 0 var(--warn); }
+.tc-ctx { padding: 6px 10px; font-size: 11.5px; color: var(--muted); border-top: 1px solid var(--border); min-height: 30px; }
+
+.ghost {
+  position: fixed; z-index: 60; pointer-events: none; font: 700 12px Inter, sans-serif; padding: 3px 10px; border-radius: 999px;
+  background: var(--c); color: var(--on-c); box-shadow: 0 6px 18px rgba(0,0,0,.25);
+  transition: transform .5s cubic-bezier(.5,0,.25,1), opacity .25s .4s;
+}
+.world { margin-top: 14px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--muted); margin-top: 12px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
 
 .narration { margin-top: 14px; min-height: 48px; padding: 12px 14px; border-radius: 10px; background: var(--surface-2); font-size: 15px; }
 .console { background: var(--code-bg); border: 1px solid var(--border); border-radius: 12px; padding: 8px 12px; height: 128px; overflow-y: auto; font: 13px/1.7 "JetBrains Mono", monospace; }
@@ -311,7 +358,9 @@ input[type=range] { accent-color: var(--prod); width: 110px; }
 footer { padding: 40px 0 60px; color: var(--muted); font-size: 14px; border-top: 1px solid var(--border); }
 
 @media (max-width: 860px) {
-  .dgrid { grid-template-columns: 1fr; }
+  .machine.two { grid-template-columns: 1fr; }
+  .machine.two .kernel { order: -1; }
+  .machine.many .kernel { grid-template-columns: 1fr; }
   .lot { grid-template-columns: 1fr 1fr; }
   .lane.park { grid-column: 1 / -1; order: -1; }
 }
@@ -324,7 +373,6 @@ footer { padding: 40px 0 60px; color: var(--muted); font-size: 14px; border-top:
   .pp-table { grid-template-columns: 64px 1fr 64px; }
   nav.links { display: none; }
   .theme-btn { margin-left: auto; }
-  .ln { grid-template-columns: 70px 20px max-content; }
 }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
@@ -353,7 +401,7 @@ footer { padding: 40px 0 60px; color: var(--muted); font-size: 14px; border-top:
 <div class="wrap hero">
   <div class="eyebrow">Operating Systems · POSIX semaphores · pthreads</div>
   <h1>Five semaphore patterns, <span class="p">one step at a time</span></h1>
-  <p class="lede">Each program below runs as a live simulation of its threads. Press Run to let a random scheduler pick, or click a thread to schedule it yourself. Every demo also has a broken version so you can see what the semaphore is preventing.</p>
+  <p class="lede">Each program below runs on a simulated single CPU. You can watch the threads take turns on the processor, follow each thread's program counter through its code, and see them block on and wake from semaphore locks. Press Run to let the scheduler decide, or press a thread's "Run next line" button to schedule it yourself. Every demo also has a broken version so you can see what the semaphore is preventing.</p>
   <div class="hero-strip">
     <div class="hero-card"><b class="mono">sem_wait</b><span>If the value is above 0, decrement it and continue. If it is 0, block until someone posts.</span></div>
     <div class="hero-card"><b class="mono">sem_post</b><span>If a thread is blocked, wake one up. Otherwise increment the value.</span></div>
@@ -365,7 +413,7 @@ footer { padding: 40px 0 60px; color: var(--muted); font-size: 14px; border-top:
 <div class="wrap">
   <div class="sec-num">00 · How to read the demos</div>
   <h2>A semaphore is a counter with a waiting line</h2>
-  <p class="sub">The purple boxes show each semaphore's value and the threads queued on it. In the code, a colored chip marks the line each thread will run next. A solid chip is ready to run, a dashed chip is blocked in <code>sem_wait</code>, and a faded chip is sleeping.</p>
+  <p class="sub">Every demo is laid out the same way. The <b>CPU</b> runs one thread at a time and shows the line it just executed. Each <b>thread</b> has a card with its own code: <b>▶</b> marks its next line (its program counter), <b>■</b> means it is blocked, and <b>z</b> means it is sleeping. Each <b>semaphore</b> is drawn as a padlock that is green and open while its value is above 0, red and shut at 0, with the threads blocked on it listed underneath. Threads that are not on the CPU wait in the ready queue, in a lock's queue, or asleep.</p>
   <div class="grid2">
     <div class="panel">
       <h3>The two operations</h3>
@@ -559,9 +607,9 @@ function compile(prog) {
   return prog;
 }
 function createSim(spec) {
-  const S = { t: 0, steps: 0, status: 'running', out: [], last: null, msg: '', cur: null,
-              shared: spec.shared || {}, sems: {}, after: spec.after };
-  for (const [k, v] of Object.entries(spec.sems)) S.sems[k] = { name: k, v, init: v, q: [] };
+  const S = { t: 0, steps: 0, status: 'running', out: [], last: null, msg: '', cur: null, onCpu: null,
+              switches: 0, tl: [], ev: null, shared: spec.shared || {}, sems: {}, after: spec.after };
+  for (const [k, v] of Object.entries(spec.sems)) S.sems[k] = { name: k, v, init: v, q: [], holders: [] };
   S.threads = spec.threads.map((t, i) => ({
     id: i, name: t.name, short: t.short || t.name, color: `var(--t${i % 8})`,
     prog: compile(t.prog.filter(Boolean)), pc: 0, state: 'ready', wake: 0, sleepFrom: 0, blockedOn: null,
@@ -577,15 +625,20 @@ function exec(S, th) {
   switch (ins.op) {
     case 'wait': {
       const s = S.sems[ins.sem];
-      if (s.v > 0) { s.v--; advance(th, ins); msg = `${th.name} calls sem_wait(&${s.name}): ${s.v + 1} → ${s.v}, and keeps going.`; }
-      else { th.state = 'blocked'; th.blockedOn = s.name; s.q.push(th); msg = `${th.name} calls sem_wait(&${s.name}), but it is 0, so ${th.name} blocks.`; }
+      if (s.v > 0) { s.v--; s.holders.push(th); advance(th, ins); msg = `${th.name} calls sem_wait(&${s.name}): ${s.v + 1} → ${s.v}, and keeps going.`; }
+      else {
+        th.state = 'blocked'; th.blockedOn = s.name; s.q.push(th); S.ev = { k: 'block', sem: s.name };
+        msg = `${th.name} calls sem_wait(&${s.name}), but it is 0, so ${th.name} blocks and leaves the CPU.`;
+      }
       break;
     }
     case 'post': {
       const s = S.sems[ins.sem];
+      const h = s.holders.indexOf(th); if (h >= 0) s.holders.splice(h, 1);
       if (s.q.length) {
-        const w = s.q.shift(); w.state = 'ready'; w.blockedOn = null; advance(w, w.prog[w.pc]);
-        msg = `${th.name} calls sem_post(&${s.name}). ${w.name} was blocked on it, so ${w.name} wakes and gets through its sem_wait.`;
+        const w = s.q.shift(); w.state = 'ready'; w.blockedOn = null; advance(w, w.prog[w.pc]); s.holders.push(w);
+        S.ev = { k: 'wake', sem: s.name, who: w };
+        msg = `${th.name} calls sem_post(&${s.name}). ${w.name} was blocked on it, so ${w.name} wakes, passes its sem_wait and joins the ready queue.`;
       } else { s.v++; msg = `${th.name} calls sem_post(&${s.name}): ${s.v - 1} → ${s.v}.`; }
       advance(th, ins);
       break;
@@ -613,17 +666,23 @@ function exec(S, th) {
 }
 function step(S, chosen, pick) {
   if (S.status !== 'running') return;
-  S.t++;
+  S.t++; S.ev = null; S.loaded = null;
   for (const th of S.threads) if (th.state === 'sleep' && th.wake <= S.t) th.state = 'ready';
   const ready = S.threads.filter(t => t.state === 'ready');
   if (!ready.length) {
-    S.last = null;
-    S.msg = 'No thread can run right now. The clock ticks while the sleeping threads wait to wake up.';
+    S.last = null; S.onCpu = null; S.tl.push(-1); if (S.tl.length > 40) S.tl.shift();
+    S.msg = 'No thread can run right now, so the CPU is idle. The clock ticks while the sleeping threads wait to wake up.';
     return;
   }
   const th = chosen && chosen.state === 'ready' ? chosen
            : pick ? pick(ready, S) : ready[Math.random() * ready.length | 0];
+  const preempted = S.onCpu && S.onCpu !== th ? S.onCpu : null;
+  if (S.cur && S.cur !== th) S.switches++;
+  if (S.onCpu !== th) S.loaded = th;
   exec(S, th); S.cur = th; S.steps++;
+  S.onCpu = th.state === 'ready' ? th : null;
+  if (preempted) S.msg = `Context switch: ${preempted.name} is preempted and ${th.name} gets the CPU. ` + S.msg;
+  S.tl.push(th.id); if (S.tl.length > 40) S.tl.shift();
   if (S.after) S.after(S);
   if (S.threads.every(t => t.state === 'done')) S.status = 'done';
   else if (!S.threads.some(t => t.state === 'ready' || t.state === 'sleep')) S.status = 'deadlock';
@@ -637,34 +696,59 @@ const TEMPLATE = `
       <button class="btn primary" data-act="play">▶ Run</button>
       <button class="btn" data-act="step">Step</button>
       <button class="btn" data-act="reset">↺ Reset</button>
-      <label class="ctl">Speed <input type="range" min="0" max="100" value="50" data-act="speed"></label>
+      <label class="ctl">Speed <input type="range" min="0" max="100" value="45" data-act="speed"></label>
     </div>
     <div class="opts"></div>
   </div>
   <div class="stage-head"><span class="verdict pending">Ready</span><span class="clock mono">t = 0</span></div>
-  <div class="stage"></div>
-  <div class="dgrid">
-    <div><div class="lbl">Code: click a chip to run that thread's next step</div><div class="codebox"></div></div>
-    <div>
-      <div class="lbl">Semaphores</div><div class="sems"></div>
-      <div class="lbl gap">Threads</div><div class="threads"></div>
-    </div>
-  </div>
+  <div class="machine"></div>
   <div class="narration"></div>
+  <div class="world"><div class="lbl">What the program models</div><div class="stage"></div></div>
   <div class="lbl gap">stdout</div><div class="console"></div>
   <div class="extra"></div>
 </div>`;
 
+const PADLOCK = `<svg class="padlock" viewBox="0 0 40 48" aria-hidden="true">
+  <path class="shackle" d="M11 23 V15 a9 9 0 0 1 18 0 V23" fill="none" stroke-width="5" stroke-linecap="round"/>
+  <rect class="body" x="4" y="22" width="32" height="24" rx="6"/>
+  <circle class="hole" cx="20" cy="32" r="3.5"/><rect class="hole" x="18.5" y="33" width="3" height="7" rx="1.5"/></svg>`;
+
 const STATE_TXT = th => th.state === 'blocked' ? `blocked on ${th.blockedOn}`
   : th.state === 'sleep' ? 'sleeping' : th.state;
+const stripCm = s => s.replace(/\s*\/\*.*?\*\/\s*$/, '');
+const unmark = s => s.replace(/^-/, '');
+/* a thread's card shows the whole function its ops live in */
+function fnRange(code, lines) {
+  let a = Math.min(...lines), b = Math.max(...lines);
+  while (a > 0 && !/^void\b/.test(unmark(code[a]))) a--;
+  while (b < code.length - 1 && unmark(code[b]) !== '}') b++;
+  return [a, b];
+}
+const qchip = (th, cls = '') => `<span class="qchip ${cls}" style="--c:${th.color}">${esc(th.short)}</span>`;
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+function fly(from, to, th) {
+  if (!from || !to || reduceMotion) return;
+  const a = from.getBoundingClientRect(), b = to.getBoundingClientRect();
+  const g = document.createElement('div');
+  g.className = 'ghost'; g.textContent = th.short; g.style.setProperty('--c', th.color);
+  g.style.left = (a.left + a.width / 2 - 20) + 'px'; g.style.top = (a.top + a.height / 2 - 12) + 'px';
+  document.body.appendChild(g);
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    g.style.transform = `translate(${b.left + b.width / 2 - a.left - a.width / 2}px, ${b.top + b.height / 2 - a.top - a.height / 2}px)`;
+    g.style.opacity = '0';
+  }));
+  setTimeout(() => g.remove(), 800);
+}
+/* the auto scheduler keeps the current thread half the time, otherwise picks any ready thread */
+const schedPick = (ready, S) => S.onCpu && ready.includes(S.onCpu) && Math.random() < 0.5 ? S.onCpu : ready[Math.random() * ready.length | 0];
 
 function mountDemo(def) {
   const host = document.querySelector(`[data-demo="${def.id}"]`);
   host.innerHTML = TEMPLATE;
   const $ = s => host.querySelector(s);
   const opts = { ...def.defaults };
-  let S, timer = null, vs = {}, lineEls = [];
-  const playBtn = $('[data-act=play]'), speedEl = $('[data-act=speed]');
+  let S, built, timer = null, vs = {}, cards = [], lockEls = {}, cpu = {};
+  const playBtn = $('[data-act=play]'), speedEl = $('[data-act=speed]'), mach = $('.machine');
 
   def.options.forEach(o => {
     const wrap = document.createElement('div'); wrap.className = 'optgrp';
@@ -686,23 +770,62 @@ function mountDemo(def) {
 
   function rebuild() {
     stop();
-    const built = def.build(opts);
+    built = def.build(opts);
     S = createSim(built); vs = {};
-    const box = $('.codebox'); box.innerHTML = '';
-    lineEls = built.code.map((raw, i) => {
-      const off = raw.startsWith('-'), src = off ? raw.slice(1) : raw;
-      const el = document.createElement('div'); el.className = 'ln' + (off ? ' off' : '');
-      el.innerHTML = `<div class="chips"></div><div class="no">${i + 1}</div><div class="src">${hl(src) || ' '}</div>`;
-      box.appendChild(el);
-      return { el, chips: el.firstChild };
+    const many = S.threads.length > 2;
+    mach.className = 'machine ' + (many ? 'many' : 'two');
+    mach.innerHTML = '';
+
+    const kernel = document.createElement('div'); kernel.className = 'kernel';
+    kernel.innerHTML = `<div class="cpu-card">
+        <div class="cpu-head"><span class="cpu-label">CPU</span><span class="cpu-clock mono"></span></div>
+        <div class="cpu-slot"></div>
+        <div class="cpu-ins mono"></div>
+        <div class="cpu-regs mono"></div>
+        <div class="cpu-row"><span>Ready queue</span><div class="qchips rq"></div></div>
+        <div class="cpu-row"><span>Sleeping</span><div class="qchips sq"></div></div>
+        <div class="cpu-tl"></div>
+        <div class="cpu-foot"><span>who ran each step →</span><span class="cs"></span></div>
+      </div><div class="locks"></div>`;
+    const k = s => kernel.querySelector(s);
+    cpu = { slot: k('.cpu-slot'), ins: k('.cpu-ins'), regs: k('.cpu-regs'), rq: k('.rq'), sq: k('.sq'), tl: k('.cpu-tl'), cs: k('.cs'), clock: k('.cpu-clock') };
+
+    const locks = k('.locks'); lockEls = {};
+    const names = Object.keys(S.sems);
+    if (!names.length) locks.innerHTML = '<div class="lock none">No semaphores in this version, so nothing ever stops a thread.</div>';
+    names.forEach(n => {
+      const el = document.createElement('div'); el.className = 'lock';
+      el.innerHTML = `${PADLOCK}<div class="lk-top"><span class="lk-name">${n}</span><span class="lk-val"></span></div>
+        <div><div class="lk-tokens"></div><div class="lk-init mono">sem_init(&amp;${n}, 0, ${S.sems[n].init})</div></div>
+        ${def.holders ? `<div class="lk-row"><span>${def.holders}</span><div class="qchips hold"></div></div>` : ''}
+        <div class="lk-row"><span>Blocked</span><div class="qchips wq"></div></div>`;
+      locks.appendChild(el);
+      lockEls[n] = { el, val: el.querySelector('.lk-val'), tok: el.querySelector('.lk-tokens'), hold: el.querySelector('.hold'), wq: el.querySelector('.wq') };
     });
+
+    cards = S.threads.map(th => {
+      const [a, b] = fnRange(built.code, th.prog.map(p => p.line));
+      const el = document.createElement('div'); el.className = 'tcard'; el.style.setProperty('--c', th.color);
+      let html = `<div class="tc-head"><span class="dot"></span><b>${esc(th.name)}</b><span class="st"></span><button class="btn sm" data-tid="${th.id}">${many ? 'Step ▸' : 'Run next line ▸'}</button></div><div class="tc-code">`;
+      for (let i = a; i <= b; i++) {
+        const raw = built.code[i], off = raw.startsWith('-');
+        const src = many ? stripCm(unmark(raw)) : unmark(raw);
+        html += `<div class="tl${off ? ' off' : ''}" data-line="${i}"><span class="pc"></span><span class="no">${i - a + 1}</span><span class="src">${hl(src) || ' '}</span></div>`;
+      }
+      el.innerHTML = html + '</div><div class="tc-ctx mono"></div>';
+      const lineEl = {}; el.querySelectorAll('.tl').forEach(x => { lineEl[x.dataset.line] = x; });
+      return { el, a, lineEl, st: el.querySelector('.st'), btn: el.querySelector('.btn'), ctx: el.querySelector('.tc-ctx'), head: el.querySelector('.tc-head') };
+    });
+    if (many) { mach.appendChild(kernel); cards.forEach(c => mach.appendChild(c.el)); }
+    else { mach.appendChild(cards[0].el); mach.appendChild(kernel); if (cards[1]) mach.appendChild(cards[1].el); }
+
     S.msg = def.hint;
-    render();
+    render(false);
   }
-  const delay = () => Math.round(1400 * Math.pow(0.04, speedEl.value / 100));
+  const delay = () => Math.round(1600 * Math.pow(0.04, speedEl.value / 100));
   function stop() { clearTimeout(timer); timer = null; playBtn.textContent = '▶ Run'; }
   function tick() {
-    step(S); render();
+    step(S, null, schedPick); render(delay() >= 300);
     if (S.status !== 'running') { stop(); return; }
     timer = setTimeout(tick, delay());
   }
@@ -712,12 +835,12 @@ function mountDemo(def) {
     playBtn.textContent = '❚❚ Pause';
     tick();
   };
-  $('[data-act=step]').onclick = () => { stop(); step(S); render(); };
+  $('[data-act=step]').onclick = () => { stop(); step(S, null, schedPick); render(true); };
   $('[data-act=reset]').onclick = rebuild;
   host.addEventListener('click', e => {
     const b = e.target.closest('[data-tid]');
     if (!b || b.disabled) return;
-    stop(); step(S, S.threads[+b.dataset.tid]); render();
+    stop(); step(S, S.threads[+b.dataset.tid]); render(true);
   });
 
   function verdict() {
@@ -727,50 +850,87 @@ function mountDemo(def) {
     if (S.status === 'done') return { cls: 'ok', text: 'Finished' };
     return { cls: 'pending', text: S.steps ? 'Running…' : 'Ready' };
   }
+  const relLine = (th, line) => line - cards[th.id].a + 1;
+  function ctxStr(th) {
+    const parts = [];
+    if (th.state !== 'done') parts.push(`pc = line ${relLine(th, th.prog[th.pc].line)}`);
+    for (const [k, v] of Object.entries(th.L)) parts.push(`${k} = ${v}`);
+    if (th.regs) for (const [k, v] of Object.entries(th.regs)) parts.push(`${k} = ${v}`);
+    return parts.join(' · ');
+  }
 
-  function render() {
+  function render(animate) {
     const v = verdict(), vEl = $('.verdict');
     vEl.className = 'verdict ' + v.cls; vEl.textContent = v.text;
     $('.clock').textContent = `t = ${S.t} · ${S.steps} steps`;
-    def.stage(S, $('.stage'), vs, opts);
+    const live = S.status === 'running', run = S.onCpu, last = S.last && S.last.th;
 
-    lineEls.forEach(l => { l.chips.innerHTML = ''; l.el.classList.remove('flash'); });
-    if (S.last && lineEls[S.last.line]) lineEls[S.last.line].el.classList.add('flash');
-    const live = S.status === 'running';
+    /* CPU */
+    cpu.clock.textContent = `t = ${S.t}`;
+    if (run) {
+      cpu.slot.className = 'cpu-slot busy'; cpu.slot.style.setProperty('--c', run.color);
+      cpu.slot.innerHTML = `<div><span class="big">${esc(run.name)}</span><br><small>is running</small></div>`;
+    } else {
+      cpu.slot.className = 'cpu-slot';
+      const why = !last ? (S.steps ? 'no thread is ready' : 'nothing scheduled yet')
+        : last.state === 'blocked' ? `${last.name} just blocked on ${last.blockedOn}`
+        : last.state === 'sleep' ? `${last.name} went to sleep` : `${last.name} finished`;
+      cpu.slot.innerHTML = `<div>idle<br><small>${esc(why)}</small></div>`;
+    }
+    cpu.ins.innerHTML = S.last
+      ? `<span class="k">exec </span>${hl(stripCm(unmark(built.code[S.last.line])).trim())}`
+      : '<span class="k">exec </span>—';
+    cpu.regs.textContent = run ? 'registers: ' + ctxStr(run) : '';
+    const rq = S.threads.filter(t => t.state === 'ready' && t !== run), sq = S.threads.filter(t => t.state === 'sleep');
+    cpu.rq.innerHTML = rq.length ? rq.map(t => qchip(t)).join('') : '<span class="qnone">empty</span>';
+    cpu.sq.innerHTML = sq.length ? sq.map(t => qchip(t, 'sleep')).join('') : '<span class="qnone">none</span>';
+    let cells = '';
+    for (let i = 0; i < 40 - S.tl.length; i++) cells += '<i></i>';
+    cells += S.tl.map(id => id < 0 ? '<i title="idle"></i>' : `<i style="background:${S.threads[id].color}" title="${esc(S.threads[id].name)}"></i>`).join('');
+    cpu.tl.innerHTML = cells;
+    cpu.cs.textContent = `${S.switches} context switch${S.switches === 1 ? '' : 'es'}`;
+
+    /* locks */
+    for (const n in lockEls) {
+      const s = S.sems[n], L = lockEls[n];
+      L.el.classList.toggle('open', s.v > 0);
+      L.val.textContent = s.v;
+      L.tok.innerHTML = '<i></i>'.repeat(Math.min(s.v, 12));
+      if (L.hold) L.hold.innerHTML = s.holders.length ? s.holders.map(t => qchip(t)).join('') : '<span class="qnone">nobody</span>';
+      L.wq.innerHTML = s.q.length ? s.q.map(t => qchip(t, 'wait')).join('') : '<span class="qnone">nobody</span>';
+    }
+
+    /* thread cards */
     S.threads.forEach(th => {
-      if (th.state === 'done') return;
-      const ins = th.prog[th.pc];
-      const c = document.createElement('button');
-      c.className = `chip ${th.state}` + (S.last && S.last.th === th ? ' last' : '');
-      c.style.setProperty('--c', th.color);
-      c.textContent = th.short + (th.state === 'sleep' ? ' zz' : '');
-      c.title = `${th.name}: ${STATE_TXT(th)}`;
-      c.disabled = !live || th.state !== 'ready';
-      c.dataset.tid = th.id;
-      lineEls[ins.line].chips.appendChild(c);
+      const c = cards[th.id];
+      c.el.classList.toggle('oncpu', th === run);
+      c.el.classList.toggle('done', th.state === 'done');
+      c.st.className = 'st ' + (th === run ? 'running' : th.state);
+      c.st.textContent = th === run ? 'on CPU' : STATE_TXT(th);
+      c.btn.disabled = !live || th.state !== 'ready';
+      for (const ln in c.lineEl) { const x = c.lineEl[ln]; x.classList.remove('cur', 'blocked', 'ran'); x.firstChild.textContent = ''; }
+      if (th.state !== 'done') {
+        const x = c.lineEl[th.prog[th.pc].line];
+        x.classList.add('cur'); if (th.state === 'blocked') x.classList.add('blocked');
+        x.firstChild.textContent = th.state === 'blocked' ? '■' : th.state === 'sleep' ? 'z' : '▶';
+      }
+      if (S.last && S.last.th === th && c.lineEl[S.last.line]) c.lineEl[S.last.line].classList.add('ran');
+      c.ctx.textContent = th.state === 'done' ? 'finished' : th === run ? 'context loaded in the CPU' : 'saved context: ' + ctxStr(th);
     });
 
-    const names = Object.keys(S.sems);
-    $('.sems').innerHTML = names.length ? names.map(n => {
-      const s = S.sems[n];
-      return `<div class="sem"><div class="sem-head"><span class="sem-name">${n}</span><span class="sem-val">${s.v}</span></div>
-        <div class="sem-q">${s.q.length ? 'blocked: ' + s.q.map(t => `<span class="tag" style="--c:${t.color}">${esc(t.short)}</span>`).join('') : 'nobody waiting'}</div></div>`;
-    }).join('') : '<div class="empty">This version has no semaphores.</div>';
-
-    $('.threads').innerHTML = S.threads.map(th => {
-      const regs = th.regs ? Object.entries(th.regs).map(([k, x]) => `${k}=${x}`).join(' ') : '';
-      return `<div class="trow${S.last && S.last.th === th ? ' last' : ''}" style="--c:${th.color}">
-        <span class="dot"></span><b>${esc(th.name)}</b><span class="st ${th.state}">${STATE_TXT(th)}</span>
-        ${regs ? `<span class="regs mono">${regs}</span>` : ''}
-        <button class="btn sm" data-tid="${th.id}" ${!live || th.state !== 'ready' ? 'disabled' : ''}>Step ▸</button></div>`;
-    }).join('');
-
+    def.stage(S, $('.stage'), vs, opts);
     $('.narration').textContent = S.msg;
     const con = $('.console');
     con.innerHTML = S.out.length
       ? S.out.map(o => `<div class="o" style="--c:${o.th.color}"><i></i>${esc(o.text)}</div>`).join('')
       : '<div class="none">(nothing printed yet)</div>';
     con.scrollTop = con.scrollHeight;
+
+    if (animate && last) {
+      if (S.loaded) fly(cards[last.id].head, cpu.slot, last);
+      if (S.ev && S.ev.k === 'block') fly(cpu.slot, lockEls[S.ev.sem].wq, last);
+      if (S.ev && S.ev.k === 'wake') fly(lockEls[S.ev.sem].el, cards[S.ev.who.id].head, S.ev.who);
+    }
   }
 
   if (def.extra) def.extra($('.extra'), opts);
@@ -781,7 +941,7 @@ function mountDemo(def) {
 const serialization = {
   id: 'serialization', defaults: { mode: 'sem' },
   options: [{ key: 'mode', choices: [['sem', 'With semaphore', 'ok'], ['none', 'Without semaphore', 'bad']] }],
-  hint: 'Press Run, or click a chip in the code to pick which thread runs next. Try running B first.',
+  hint: 'Press Run, or press a thread\'s "Run next line" to put it on the CPU yourself. Try running B first: it will block on the done lock.',
   build(o) {
     const sem = o.mode === 'sem', off = sem ? '' : '-';
     const { code, ln } = CB();
@@ -954,6 +1114,7 @@ const tickets = {
   options: [
     { key: 'mode', choices: [['mutex', 'With mutex', 'ok'], ['race', 'No mutex', 'bad'], ['forget', 'Forget sem_post when sold out', 'bad']] },
     { key: 'n', label: 'Tickets:', choices: [['5', '5'], ['10', '10'], ['20', '20']] }],
+  holders: 'Holding',
   hint: 'Each seller holds its own register copies (r, s). Without the mutex, try loading on A, then on B, then storing both.',
   build(o) {
     const n = +o.n, mode = o.mode, sem = mode !== 'race', off = sem ? '' : '-';
@@ -1053,6 +1214,7 @@ const parking = {
     { key: 'mode', choices: [['sem', 'With semaphore', 'ok'], ['none', 'No semaphore', 'bad']] },
     { key: 'spots', label: 'Spots:', choices: [['1', '1'], ['2', '2'], ['3', '3'], ['4', '4']] },
     { key: 'cars', label: 'Cars:', choices: [['4', '4'], ['6', '6'], ['8', '8']] }],
+  holders: 'Parked',
   hint: 'Every car tries to take a spot. Once the semaphore reaches 0, the next cars queue at the gate.',
   build(o) {
     const spots = +o.spots, cars = +o.cars, sem = o.mode === 'sem', off = sem ? '' : '-';
