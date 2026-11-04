@@ -1,0 +1,1154 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Semaphore Patterns Visualized</title>
+<meta name="description" content="Interactive step-through visualizations of five classic POSIX semaphore patterns: serialization, rendezvous, ping-pong, mutex (ticket sellers) and counting (parking lot).">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f6f7fb;
+  --surface: #ffffff;
+  --surface-2: #eef0f6;
+  --border: #dcdfe8;
+  --text: #171a23;
+  --muted: #5b6275;
+  --prod: #2f6fe4;
+  --prod-soft: #dce7fd;
+  --ok: #1f9d55;
+  --ok-soft: #d6f2e1;
+  --bad: #d93838;
+  --bad-soft: #fbdcdc;
+  --warn: #b58300;
+  --warn-soft: #fbf0d0;
+  --mem: #7a4fd6;
+  --mem-soft: #e9e0fb;
+  --code-bg: #f3f4f9;
+  --on-c: #ffffff;
+  --t0: #2f6fe4; --t1: #d9731a; --t2: #1f9d55; --t3: #b0399a;
+  --t4: #7a4fd6; --t5: #c23b3b; --t6: #0f8b8d; --t7: #8a6d1d;
+  --shadow: 0 1px 2px rgba(20,24,40,.06), 0 4px 16px rgba(20,24,40,.06);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1117;
+    --surface: #171a23;
+    --surface-2: #1f2330;
+    --border: #2c3142;
+    --text: #e8eaf1;
+    --muted: #9aa1b5;
+    --prod: #6d9cff;
+    --prod-soft: #1d2a48;
+    --ok: #3ccf7d;
+    --ok-soft: #173326;
+    --bad: #ff6b6b;
+    --bad-soft: #3d1c1f;
+    --warn: #f2c14e;
+    --warn-soft: #3a3016;
+    --mem: #b18cff;
+    --mem-soft: #2a2140;
+    --code-bg: #12141b;
+    --on-c: #0f1117;
+    --t0: #6d9cff; --t1: #ffa25a; --t2: #3ccf7d; --t3: #f07ad8;
+    --t4: #b18cff; --t5: #ff7b7b; --t6: #3fd0d2; --t7: #e0c060;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 4px 16px rgba(0,0,0,.25);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1117;
+  --surface: #171a23;
+  --surface-2: #1f2330;
+  --border: #2c3142;
+  --text: #e8eaf1;
+  --muted: #9aa1b5;
+  --prod: #6d9cff;
+  --prod-soft: #1d2a48;
+  --ok: #3ccf7d;
+  --ok-soft: #173326;
+  --bad: #ff6b6b;
+  --bad-soft: #3d1c1f;
+  --warn: #f2c14e;
+  --warn-soft: #3a3016;
+  --mem: #b18cff;
+  --mem-soft: #2a2140;
+  --code-bg: #12141b;
+  --on-c: #0f1117;
+  --t0: #6d9cff; --t1: #ffa25a; --t2: #3ccf7d; --t3: #f07ad8;
+  --t4: #b18cff; --t5: #ff7b7b; --t6: #3fd0d2; --t7: #e0c060;
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 4px 16px rgba(0,0,0,.25);
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.6 Inter, system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+code, pre, .mono { font-family: "JetBrains Mono", ui-monospace, Menlo, monospace; }
+a { color: var(--prod); }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 0 16px; }
+
+/* ---------- header ---------- */
+header.top {
+  position: sticky; top: 0; z-index: 20;
+  background: color-mix(in srgb, var(--bg) 85%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border);
+}
+header.top .wrap { display: flex; align-items: center; gap: 16px; height: 56px; }
+.brand { font-weight: 800; letter-spacing: -.01em; white-space: nowrap; }
+.brand span { color: var(--prod); }
+nav.links { display: flex; gap: 4px; margin-left: auto; overflow-x: auto; scrollbar-width: none; }
+nav.links a {
+  color: var(--muted); text-decoration: none; font-size: 14px; font-weight: 500;
+  padding: 6px 10px; border-radius: 8px; white-space: nowrap;
+}
+nav.links a:hover { background: var(--surface-2); color: var(--text); }
+.theme-btn {
+  border: 1px solid var(--border); background: var(--surface); color: var(--text);
+  width: 34px; height: 34px; border-radius: 8px; cursor: pointer; flex: none; font-size: 16px;
+}
+
+/* ---------- hero ---------- */
+.hero { padding-top: 56px; padding-bottom: 24px; }
+.eyebrow { text-transform: uppercase; letter-spacing: .12em; font-size: 12px; font-weight: 700; color: var(--muted); }
+h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.08; letter-spacing: -.025em; margin: 10px 0 16px; }
+h1 .p { color: var(--prod); }
+.lede { font-size: 19px; color: var(--muted); max-width: 760px; margin: 0; }
+.hero-strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 28px; }
+.hero-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px; box-shadow: var(--shadow); }
+.hero-card b { display: block; font-size: 24px; letter-spacing: -.02em; }
+.hero-card span { color: var(--muted); font-size: 14px; }
+
+/* ---------- sections ---------- */
+section.block { padding: 40px 0; border-top: 1px solid var(--border); scroll-margin-top: 56px; }
+h2 { font-size: clamp(24px, 3.2vw, 32px); letter-spacing: -.02em; margin: 6px 0 8px; line-height: 1.2; }
+h3 { font-size: 18px; margin: 0 0 8px; }
+.sec-num { color: var(--muted); font-weight: 700; font-size: 13px; letter-spacing: .1em; text-transform: uppercase; }
+.sec-num code { text-transform: none; letter-spacing: 0; color: var(--prod); }
+.sub { color: var(--muted); max-width: 780px; margin: 0 0 20px; }
+.panel { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 20px; box-shadow: var(--shadow); }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.grid2 > * { min-width: 0; }
+.callout { border-left: 4px solid var(--prod); background: var(--surface); padding: 12px 16px; border-radius: 0 10px 10px 0; margin: 16px 0 0; }
+.callout.bad { border-color: var(--bad); }
+.callout.ok { border-color: var(--ok); }
+.callout p { margin: 4px 0; }
+
+pre.code {
+  background: var(--code-bg); border: 1px solid var(--border); border-radius: 12px;
+  padding: 14px 16px; margin: 0; font-size: 13px; line-height: 1.65; overflow-x: auto;
+}
+.kw { color: var(--mem); font-weight: 600; } .cm { color: var(--muted); font-style: italic; }
+.fn { color: var(--prod); font-weight: 700; } .str { color: var(--ok); } .num { color: var(--t1); }
+details.src { margin-top: 12px; }
+details.src summary { cursor: pointer; color: var(--muted); font-size: 14px; font-weight: 600; }
+details.src pre { margin-top: 8px; }
+
+table.pat { width: 100%; border-collapse: collapse; font-size: 14px; }
+table.pat th, table.pat td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+table.pat th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+table.pat td code { font-size: 12.5px; }
+.tablewrap { overflow-x: auto; }
+
+/* ---------- buttons / controls ---------- */
+.btn {
+  font: 600 14px Inter, sans-serif; border-radius: 10px; padding: 8px 14px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text);
+  transition: background .15s, transform .05s;
+}
+.btn:hover { background: var(--surface-2); }
+.btn:active { transform: translateY(1px); }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+.btn.primary { background: var(--text); border-color: var(--text); color: var(--bg); min-width: 96px; }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn.sm { padding: 3px 10px; font-size: 12px; border-radius: 8px; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.seg { display: inline-flex; background: var(--surface-2); border-radius: 10px; padding: 3px; gap: 2px; flex-wrap: wrap; }
+.seg button {
+  border: 0; background: transparent; color: var(--muted); font: 600 13px Inter, sans-serif;
+  padding: 6px 12px; border-radius: 8px; cursor: pointer;
+}
+.seg button.on { background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
+.seg button.on.bad { color: var(--bad); } .seg button.on.ok { color: var(--ok); }
+label.ctl { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 8px; font-weight: 500; }
+input[type=range] { accent-color: var(--prod); width: 110px; }
+.optgrp { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.optlbl { font-size: 13px; color: var(--muted); font-weight: 600; }
+
+/* ---------- demo layout ---------- */
+.sim-top { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.opts { display: flex; flex-wrap: wrap; gap: 10px 16px; }
+.stage-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.clock { font-size: 13px; color: var(--muted); }
+.verdict { font-weight: 700; padding: 6px 12px; border-radius: 999px; font-size: 14px; }
+.verdict.ok { background: var(--ok-soft); color: var(--ok); }
+.verdict.bad { background: var(--bad-soft); color: var(--bad); }
+.verdict.warn { background: var(--warn-soft); color: var(--warn); }
+.verdict.pending { background: var(--surface-2); color: var(--muted); }
+.stage { background: var(--surface-2); border-radius: 14px; padding: 16px; min-height: 120px; }
+.dgrid { display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; margin-top: 16px; }
+.dgrid > * { min-width: 0; }
+.lbl { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; margin: 0 0 6px; }
+.lbl.gap { margin-top: 14px; }
+
+.codebox { background: var(--code-bg); border: 1px solid var(--border); border-radius: 12px; padding: 8px 6px; overflow-x: auto; }
+.ln { display: grid; grid-template-columns: 96px 22px max-content; align-items: center; min-height: 28px; border-radius: 6px; padding: 1px 6px 1px 0; }
+.ln.flash { background: color-mix(in srgb, var(--warn) 16%, transparent); }
+.ln .chips { display: flex; flex-wrap: wrap; gap: 3px; justify-content: flex-end; padding-right: 8px; }
+.ln .no { color: var(--muted); font: 11px "JetBrains Mono", monospace; opacity: .7; }
+.ln .src { white-space: pre; font: 13px/1.6 "JetBrains Mono", monospace; }
+.ln.off .src { text-decoration: line-through; opacity: .45; }
+
+.chip {
+  --c: var(--t0);
+  font: 700 11px Inter, sans-serif; color: var(--on-c); background: var(--c); border: 2px solid var(--c);
+  padding: 1px 7px; border-radius: 999px; cursor: pointer; white-space: nowrap; line-height: 1.4;
+}
+.chip:disabled { cursor: default; }
+.chip.blocked { background: transparent; color: var(--c); border-style: dashed; }
+.chip.sleep { opacity: .55; }
+.chip.last { box-shadow: 0 0 0 3px color-mix(in srgb, var(--c) 35%, transparent); }
+.chip.ready:not(:disabled):hover { filter: brightness(1.1); transform: translateY(-1px); }
+
+.sems { display: flex; flex-wrap: wrap; gap: 8px; }
+.sem { flex: 1 1 140px; border: 2px solid var(--mem); background: var(--mem-soft); border-radius: 12px; padding: 8px 12px; }
+.sem-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.sem-name { font: 600 12px "JetBrains Mono", monospace; color: var(--mem); }
+.sem-val { font: 800 26px/1.1 "JetBrains Mono", monospace; }
+.sem-q { font-size: 12px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-top: 4px; min-height: 22px; }
+.tag { --c: var(--t0); font: 700 11px Inter, sans-serif; border: 2px dashed var(--c); color: var(--c); border-radius: 999px; padding: 0 7px; }
+.empty { font-size: 13px; color: var(--muted); padding: 10px 12px; border: 1px dashed var(--border); border-radius: 10px; }
+
+.threads { display: flex; flex-direction: column; gap: 4px; }
+.trow { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 9px; border: 1px solid var(--border); background: var(--surface); font-size: 13px; }
+.trow.last { border-color: var(--c); box-shadow: 0 0 0 2px color-mix(in srgb, var(--c) 25%, transparent); }
+.dot { width: 10px; height: 10px; border-radius: 50%; background: var(--c); flex: none; }
+.trow b { white-space: nowrap; }
+.st { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px; background: var(--surface-2); color: var(--muted); white-space: nowrap; }
+.st.ready { color: var(--ok); background: var(--ok-soft); }
+.st.blocked { color: var(--bad); background: var(--bad-soft); }
+.st.sleep { color: var(--warn); background: var(--warn-soft); }
+.regs { font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+.trow .btn { margin-left: auto; }
+
+.narration { margin-top: 14px; min-height: 48px; padding: 12px 14px; border-radius: 10px; background: var(--surface-2); font-size: 15px; }
+.console { background: var(--code-bg); border: 1px solid var(--border); border-radius: 12px; padding: 8px 12px; height: 128px; overflow-y: auto; font: 13px/1.7 "JetBrains Mono", monospace; }
+.console .o { display: flex; gap: 8px; align-items: center; }
+.console .o i { width: 4px; height: 14px; border-radius: 2px; background: var(--c); flex: none; }
+.console .none { color: var(--muted); font-style: italic; }
+
+/* ---------- stage widgets ---------- */
+.duo { display: grid; grid-template-columns: 1fr 120px 1fr; gap: 12px; align-items: center; }
+.station { background: var(--surface); border: 2px solid var(--c); border-radius: 14px; padding: 14px; }
+.station.good { background: var(--ok-soft); border-color: var(--ok); }
+.station.bad { background: var(--bad-soft); border-color: var(--bad); }
+.st-k { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.st-v { font-size: 22px; font-weight: 800; letter-spacing: -.01em; margin: 4px 0 10px; }
+.meter { height: 8px; border-radius: 99px; background: var(--surface-2); overflow: hidden; }
+.meter i { display: block; height: 100%; background: var(--c); transition: width .3s; }
+.link { text-align: center; font-size: 13px; }
+.link .arrow { font-size: 22px; color: var(--mem); line-height: 1; }
+.link .mono { color: var(--mem); font-weight: 700; }
+
+.zones { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.zone { background: var(--surface); border: 1px dashed var(--border); border-radius: 12px; padding: 10px; min-height: 120px; }
+.zone.meet { border: 2px solid var(--mem); }
+.zone h4 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.person { background: var(--c); color: var(--on-c); border-radius: 10px; padding: 6px 10px; margin-bottom: 6px; }
+.person b { display: block; font-size: 15px; }
+.person small { font-size: 12px; opacity: .9; }
+
+.pp-table { display: grid; grid-template-columns: 90px 1fr 90px; gap: 10px; align-items: center; }
+.paddle { background: var(--c); color: var(--on-c); border-radius: 12px; padding: 12px 6px; text-align: center; font-weight: 800; }
+.paddle small { display: block; font-weight: 600; font-size: 11px; opacity: .9; }
+.court { position: relative; height: 64px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border); }
+.court .net { position: absolute; left: 50%; top: 8px; bottom: 8px; border-left: 2px dashed var(--border); }
+.court .ball { position: absolute; top: 50%; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%; background: var(--warn); transition: left .45s cubic-bezier(.5,0,.25,1); }
+.seq { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+.pp { --c: var(--t0); font: 700 13px "JetBrains Mono", monospace; padding: 4px 10px; border-radius: 8px; background: var(--c); color: var(--on-c); }
+.pp.slot { background: transparent; color: var(--muted); border: 1px dashed var(--border); }
+.pp.bad { outline: 3px solid var(--bad); outline-offset: 1px; }
+
+.tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.tile { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; }
+.tile span { font-size: 12px; color: var(--muted); display: block; }
+.tile b { font: 800 26px/1.2 "JetBrains Mono", monospace; }
+.tile.bad { border-color: var(--bad); background: var(--bad-soft); }
+.tile.bad b { color: var(--bad); }
+.stubs { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 12px; }
+.stub { --c: var(--border); width: 30px; height: 22px; border-radius: 4px; border: 2px dashed var(--border); font: 700 10px "JetBrains Mono", monospace; display: grid; place-items: center; color: var(--muted); }
+.stub.sold { background: var(--c); border: 2px solid var(--c); color: var(--on-c); }
+.stub.over { outline: 3px solid var(--bad); outline-offset: 1px; }
+.csbar { margin-top: 12px; padding: 8px 12px; border-radius: 10px; font-size: 14px; background: var(--surface); border: 1px solid var(--border); }
+.csbar.bad { background: var(--bad-soft); border-color: var(--bad); color: var(--bad); font-weight: 700; }
+.fast { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
+.fast-out { font-size: 13.5px; }
+
+.lot { display: grid; grid-template-columns: 1fr 1fr 1.5fr 1fr; gap: 10px; }
+.lane { background: var(--surface); border: 1px dashed var(--border); border-radius: 12px; padding: 10px; min-height: 120px; }
+.lane.gate { border: 2px solid var(--bad); border-style: dashed; }
+.lane.park { border: 2px solid var(--mem); border-style: solid; }
+.lane h4 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.cars { display: flex; flex-wrap: wrap; gap: 5px; }
+.car { --c: var(--t0); font: 700 12px Inter, sans-serif; background: var(--c); color: var(--on-c); border-radius: 7px; padding: 3px 8px; white-space: nowrap; }
+.car.wait { background: transparent; color: var(--c); border: 2px dashed var(--c); }
+.car.gone { opacity: .45; }
+.spots { display: grid; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap: 6px; }
+.spot { height: 44px; border-radius: 8px; border: 2px dashed var(--mem); display: grid; place-items: center; color: var(--mem); font: 700 12px "JetBrains Mono", monospace; }
+.spot.full { border-style: solid; background: var(--mem-soft); }
+.overflow { margin-top: 8px; padding: 6px; border-radius: 8px; background: var(--bad-soft); color: var(--bad); font-size: 12px; font-weight: 700; }
+.overflow .cars { margin-top: 4px; }
+.lotstats { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 10px; font-size: 14px; color: var(--muted); }
+.lotstats b { color: var(--text); font-family: "JetBrains Mono", monospace; }
+
+footer { padding: 40px 0 60px; color: var(--muted); font-size: 14px; border-top: 1px solid var(--border); }
+
+@media (max-width: 860px) {
+  .dgrid { grid-template-columns: 1fr; }
+  .lot { grid-template-columns: 1fr 1fr; }
+  .lane.park { grid-column: 1 / -1; order: -1; }
+}
+@media (max-width: 640px) {
+  .hero-strip, .grid2 { grid-template-columns: 1fr; }
+  .tiles { grid-template-columns: 1fr 1fr; }
+  .duo { grid-template-columns: 1fr; }
+  .zones { grid-template-columns: 1fr; }
+  .zone { min-height: 0; }
+  .pp-table { grid-template-columns: 64px 1fr 64px; }
+  nav.links { display: none; }
+  .theme-btn { margin-left: auto; }
+  .ln { grid-template-columns: 70px 20px max-content; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .court .ball, .meter i { transition: none; }
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <div class="brand">Semaphore<span>/</span>Patterns</div>
+    <nav class="links">
+      <a href="#model">Model</a>
+      <a href="#serialization">Serialization</a>
+      <a href="#rendezvous">Rendezvous</a>
+      <a href="#pingpong">Ping-pong</a>
+      <a href="#tickets">Mutex</a>
+      <a href="#parking">Parking lot</a>
+    </nav>
+    <button class="theme-btn" id="themeBtn" title="Toggle theme" aria-label="Toggle theme">◐</button>
+  </div>
+</header>
+
+<main>
+<div class="wrap hero">
+  <div class="eyebrow">Operating Systems · POSIX semaphores · pthreads</div>
+  <h1>Five semaphore patterns, <span class="p">one step at a time</span></h1>
+  <p class="lede">Each program below runs as a live simulation of its threads. Press Run to let a random scheduler pick, or click a thread to schedule it yourself. Every demo also has a broken version so you can see what the semaphore is preventing.</p>
+  <div class="hero-strip">
+    <div class="hero-card"><b class="mono">sem_wait</b><span>If the value is above 0, decrement it and continue. If it is 0, block until someone posts.</span></div>
+    <div class="hero-card"><b class="mono">sem_post</b><span>If a thread is blocked, wake one up. Otherwise increment the value.</span></div>
+    <div class="hero-card"><b>Initial value</b><span>Choosing the starting count picks the pattern: 0 signals, 1 is a lock, N limits how many run at once.</span></div>
+  </div>
+</div>
+
+<section class="block" id="model">
+<div class="wrap">
+  <div class="sec-num">00 · How to read the demos</div>
+  <h2>A semaphore is a counter with a waiting line</h2>
+  <p class="sub">The purple boxes show each semaphore's value and the threads queued on it. In the code, a colored chip marks the line each thread will run next. A solid chip is ready to run, a dashed chip is blocked in <code>sem_wait</code>, and a faded chip is sleeping.</p>
+  <div class="grid2">
+    <div class="panel">
+      <h3>The two operations</h3>
+<pre class="code"><span class="fn">sem_wait</span>(s):            <span class="cm">/* a.k.a. P, down, acquire */</span>
+  <span class="kw">if</span> (s.value &gt; <span class="num">0</span>) s.value--;
+  <span class="kw">else</span> block this thread on s.queue;
+
+<span class="fn">sem_post</span>(s):            <span class="cm">/* a.k.a. V, up, release */</span>
+  <span class="kw">if</span> (s.queue not empty) wake one thread;
+  <span class="kw">else</span> s.value++;</pre>
+      <p style="font-size:14px;color:var(--muted);margin:12px 0 0">Each step runs atomically, so no two threads can both see value 1 and both decrement it. The simulator hands the woken thread straight through its <code>sem_wait</code>. POSIX instead increments the value and lets the woken thread decrement it, which ends up in the same state.</p>
+    </div>
+    <div class="panel">
+      <h3>Five patterns, five starting values</h3>
+      <div class="tablewrap">
+      <table class="pat">
+        <tr><th>Pattern</th><th>Program</th><th>Initial value(s)</th></tr>
+        <tr><td><a href="#serialization">Serialization</a><br><small>A before B</small></td><td><code>serialization.c</code></td><td><code>done = 0</code></td></tr>
+        <tr><td><a href="#rendezvous">Rendezvous</a><br><small>wait for each other</small></td><td><code>rendezvous.c</code></td><td><code>alice_here = 0</code><br><code>bob_here = 0</code></td></tr>
+        <tr><td><a href="#pingpong">Alternation</a><br><small>take turns</small></td><td><code>pingpong.c</code></td><td><code>ping_turn = 1</code><br><code>pong_turn = 0</code></td></tr>
+        <tr><td><a href="#tickets">Mutual exclusion</a><br><small>one at a time</small></td><td><code>tickets.c</code></td><td><code>mutex = 1</code></td></tr>
+        <tr><td><a href="#parking">Multiplex / counting</a><br><small>at most N at a time</small></td><td><code>parking.c</code></td><td><code>spots = 3</code></td></tr>
+      </table>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+<section class="block" id="serialization">
+<div class="wrap">
+  <div class="sec-num">01 · <code>serialization.c</code> · signaling</div>
+  <h2>B must not pour until A has boiled the water</h2>
+  <p class="sub">B is created first and A sleeps before boiling, so without coordination B would run first. <code>done</code> starts at 0, which means "not yet". B blocks on it until A's <code>sem_post</code> says the water is ready.</p>
+  <div data-demo="serialization"></div>
+  <div class="callout ok"><p><b>Pattern:</b> initialize to 0. The thread that must go second calls <code>sem_wait</code> and the thread that goes first calls <code>sem_post</code> when it is finished. The order holds even if B starts waiting long before A finishes.</p></div>
+  <details class="src"><summary>Original source: serialization.c</summary><pre class="code" data-src="serialization.c"></pre></details>
+</div>
+</section>
+
+<section class="block" id="rendezvous">
+<div class="wrap">
+  <div class="sec-num">02 · <code>rendezvous.c</code> · two-way signaling</div>
+  <h2>Neither Alice nor Bob may leave until both have arrived</h2>
+  <p class="sub">This is serialization in both directions at once. Each thread announces its own arrival with <code>sem_post</code>, then waits for the other's announcement. Bob is late (<code>sleep(1)</code>), so Alice ends up waiting on <code>bob_here</code>.</p>
+  <div data-demo="rendezvous"></div>
+  <div class="callout bad"><p><b>Order matters:</b> signal first, then wait. If both threads wait before they signal (try "Wait, then signal"), each one is blocked waiting for a post the other will never reach. That is a deadlock.</p></div>
+  <details class="src"><summary>Original source: rendezvous.c</summary><pre class="code" data-src="rendezvous.c"></pre></details>
+</div>
+</section>
+
+<section class="block" id="pingpong">
+<div class="wrap">
+  <div class="sec-num">03 · <code>pingpong.c</code> · strict alternation</div>
+  <h2>Two semaphores pass a single turn back and forth</h2>
+  <p class="sub">Exactly one of <code>ping_turn</code> and <code>pong_turn</code> holds a 1 at any time, and that 1 is the turn. Each thread spends the turn (<code>sem_wait</code> on its own semaphore), prints, then hands the turn to the other (<code>sem_post</code> on the other semaphore). Change the initial values to see how alternation breaks.</p>
+  <div data-demo="pingpong"></div>
+  <div class="callout"><p><b>The initial values are the whole design.</b> (1, 0) means ping goes first. (0, 0) means nobody has the turn, so both threads deadlock. (1, 1) means both have a turn and can print out of order.</p></div>
+  <details class="src"><summary>Original source: pingpong.c</summary><pre class="code" data-src="pingpong.c"></pre></details>
+</div>
+</section>
+
+<section class="block" id="tickets">
+<div class="wrap">
+  <div class="sec-num">04 · <code>tickets.c</code> · mutual exclusion</div>
+  <h2>Two sellers, one shared counter</h2>
+  <p class="sub"><code>tickets--</code> and <code>sold++</code> are not atomic. Each one loads the value into a register, changes it there, and stores it back, and the simulator shows those as separate steps. The <code>mutex</code> semaphore (initial value 1) lets only one seller between <code>sem_wait</code> and <code>sem_post</code> at a time. The real program sells 100,000 tickets; here you can step through 5, 10 or 20, or run the full 100,000 at the bottom.</p>
+  <div data-demo="tickets"></div>
+  <div class="callout bad"><p><b>Two ways to break it:</b> remove the mutex and the sellers' load and store steps interleave, so updates are lost and tickets can be oversold. Keep the mutex but <code>return</code> without <code>sem_post</code> on the sold-out path, and the first seller to finish leaves the counter locked forever. That is why the source says "release first!"</p></div>
+  <details class="src"><summary>Original source: tickets.c</summary><pre class="code" data-src="tickets.c"></pre></details>
+</div>
+</section>
+
+<section class="block" id="parking">
+<div class="wrap">
+  <div class="sec-num">05 · <code>parking.c</code> · counting semaphore</div>
+  <h2>Six cars, three spots</h2>
+  <p class="sub">A counting semaphore starts at N, the number of identical resources. Each <code>sem_wait</code> takes one and each <code>sem_post</code> returns one. When the count reaches 0, the next car queues at the gate until someone leaves. Change the number of spots and cars, or remove the semaphore and watch the lot overflow.</p>
+  <div data-demo="parking"></div>
+  <div class="callout ok"><p><b>Pattern (multiplex):</b> initialize to N to allow at most N threads in a region at once. A mutex is the special case N = 1. The semaphore only counts free spots. It doesn't say which spot a car gets, so the drawing picks the first free one.</p></div>
+  <details class="src"><summary>Original source: parking.c</summary><pre class="code" data-src="parking.c"></pre></details>
+</div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">Interactive teaching demo for Operating Systems: semaphore patterns with POSIX threads. Pure HTML/CSS/JS, no dependencies. To run the C programs, compile with <code>gcc file.c -pthread</code> on Linux. macOS doesn't implement unnamed semaphores, so <code>sem_init</code> fails there. <a href="https://github.com/mdszn9/semaphore-patterns-demo">Source on GitHub</a>.</div>
+</footer>
+
+<script type="text/plain" id="src-serialization.c">#include <stdio.h>
+#include <pthread.h>
+#include <semaphore.h>
+#include <unistd.h>
+sem_t done;                                       /* 0 = A has not finished yet */
+void *A(void *arg) { sleep(1); printf("A: boil water\n");
+                     sem_post(&done); return NULL; }    /* signal: A is done */
+void *B(void *arg) { sem_wait(&done);                   /* wait for A's signal */
+                     printf("B: pour tea\n"); return NULL; }
+int main(void) {
+    pthread_t a, b; sem_init(&done, 0, 0);
+    pthread_create(&b, NULL, B, NULL); pthread_create(&a, NULL, A, NULL);
+    pthread_join(a, NULL); pthread_join(b, NULL); }</script>
+<script type="text/plain" id="src-rendezvous.c">#include <stdio.h>
+#include <pthread.h>
+#include <semaphore.h>
+#include <unistd.h>
+sem_t alice_here, bob_here;                       /* 0 = not arrived yet */
+void *alice(void *arg) { printf("Alice arrives\n"); sem_post(&alice_here);  /* announce */
+                         sem_wait(&bob_here);                               /* wait for Bob */
+                         printf("Alice leaves\n"); return NULL; }
+void *bob(void *arg)   { sleep(1); printf("Bob arrives\n"); sem_post(&bob_here);
+                         sem_wait(&alice_here);
+                         printf("Bob leaves\n"); return NULL; }
+int main(void) {
+    pthread_t a, b; sem_init(&alice_here, 0, 0); sem_init(&bob_here, 0, 0);
+    pthread_create(&a, NULL, alice, NULL); pthread_create(&b, NULL, bob, NULL);
+    pthread_join(a, NULL); pthread_join(b, NULL); }</script>
+<script type="text/plain" id="src-pingpong.c">#include <stdio.h>
+#include <pthread.h>
+#include <semaphore.h>
+sem_t ping_turn, pong_turn;                       /* whose turn is it? */
+void *ping(void *arg) {
+    for (int i = 0; i < 5; i++) { sem_wait(&ping_turn); printf("ping\n"); sem_post(&pong_turn); }
+    return NULL; }
+void *pong(void *arg) {
+    for (int i = 0; i < 5; i++) { sem_wait(&pong_turn); printf("pong\n"); sem_post(&ping_turn); }
+    return NULL; }
+int main(void) {
+    pthread_t a, b; sem_init(&ping_turn, 0, 1); sem_init(&pong_turn, 0, 0);   /* ping goes first */
+    pthread_create(&b, NULL, pong, NULL); pthread_create(&a, NULL, ping, NULL);
+    pthread_join(a, NULL); pthread_join(b, NULL); }</script>
+<script type="text/plain" id="src-tickets.c">#include <stdio.h>
+#include <pthread.h>
+#include <semaphore.h>
+sem_t mutex;                                      /* 1 = ticket counter is free */
+int tickets = 100000, sold = 0;                   /* shared by both sellers */
+void *seller(void *arg) {
+    while (1) { sem_wait(&mutex);                 /* one seller at a time */
+        if (tickets <= 0) { sem_post(&mutex); return NULL; }   /* sold out: release first! */
+        tickets--; sold++;                        /* sell one ticket */
+        sem_post(&mutex); } }
+int main(void) {
+    pthread_t a, b; sem_init(&mutex, 0, 1);
+    pthread_create(&a, NULL, seller, NULL); pthread_create(&b, NULL, seller, NULL);
+    pthread_join(a, NULL); pthread_join(b, NULL);
+    printf("sold = %d, left = %d (expected 100000, 0)\n", sold, tickets); }</script>
+<script type="text/plain" id="src-parking.c">#include <stdio.h>
+#include <pthread.h>
+#include <semaphore.h>
+#include <unistd.h>
+sem_t spots;                                      /* counts free parking spots */
+void *car(void *arg) {
+    sem_wait(&spots);                             /* take a spot; blocks if lot is full */
+    printf("Car %ld parks\n", (long)arg); sleep(1);
+    printf("Car %ld leaves\n", (long)arg);
+    sem_post(&spots);                             /* free the spot */
+    return NULL; }
+int main(void) {
+    pthread_t t[6]; sem_init(&spots, 0, 3);       /* lot has 3 spots */
+    for (long i = 0; i < 6; i++) pthread_create(&t[i], NULL, car, (void *)i);
+    for (int i = 0; i < 6; i++) pthread_join(t[i], NULL); }</script>
+
+<script>
+/* ---------- helpers ---------- */
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+function hl(s) {
+  const re = /(\/\*.*?\*\/)|("(?:[^"\\]|\\.)*")|\b(void|int|long|return|while|for|if|NULL|sem_t|pthread_t)\b|\b(sem_wait|sem_post|sem_init)\b|\b(\d+)\b/g;
+  let out = '', i = 0, m;
+  while ((m = re.exec(s))) {
+    out += esc(s.slice(i, m.index));
+    const t = esc(m[0]);
+    out += m[1] ? `<span class="cm">${t}</span>` : m[2] ? `<span class="str">${t}</span>`
+         : m[3] ? `<span class="kw">${t}</span>` : m[4] ? `<span class="fn">${t}</span>` : `<span class="num">${t}</span>`;
+    i = re.lastIndex;
+  }
+  return out + esc(s.slice(i));
+}
+/* code builder: ln() appends a line and returns its index; a leading '-' marks a removed line */
+function CB() { const code = []; return { code, ln: s => (code.push(s), code.length - 1) }; }
+
+/* ---------- simulation engine ----------
+   Each thread runs a list of atomic ops: wait, post, print, sleep, do, if, end.
+   One step = one op by one thread. */
+function compile(prog) {
+  const labels = {};
+  prog.forEach((p, i) => { if (p.label) labels[p.label] = i; });
+  prog.forEach(p => {
+    if (typeof p.to === 'string') p.to = labels[p.to];
+    if (typeof p.elseTo === 'string') p.elseTo = labels[p.elseTo];
+  });
+  return prog;
+}
+function createSim(spec) {
+  const S = { t: 0, steps: 0, status: 'running', out: [], last: null, msg: '', cur: null,
+              shared: spec.shared || {}, sems: {}, after: spec.after };
+  for (const [k, v] of Object.entries(spec.sems)) S.sems[k] = { name: k, v, init: v, q: [] };
+  S.threads = spec.threads.map((t, i) => ({
+    id: i, name: t.name, short: t.short || t.name, color: `var(--t${i % 8})`,
+    prog: compile(t.prog.filter(Boolean)), pc: 0, state: 'ready', wake: 0, sleepFrom: 0, blockedOn: null,
+    L: { ...(t.locals || {}) }, regs: t.regs ? { ...t.regs } : null, meta: t.meta || {}
+  }));
+  return S;
+}
+const advance = (th, ins) => { th.pc = ins.to != null ? ins.to : th.pc + 1; };
+function exec(S, th) {
+  const ins = th.prog[th.pc];
+  let msg = '';
+  S.last = { th, line: ins.line };
+  switch (ins.op) {
+    case 'wait': {
+      const s = S.sems[ins.sem];
+      if (s.v > 0) { s.v--; advance(th, ins); msg = `${th.name} calls sem_wait(&${s.name}): ${s.v + 1} → ${s.v}, and keeps going.`; }
+      else { th.state = 'blocked'; th.blockedOn = s.name; s.q.push(th); msg = `${th.name} calls sem_wait(&${s.name}), but it is 0, so ${th.name} blocks.`; }
+      break;
+    }
+    case 'post': {
+      const s = S.sems[ins.sem];
+      if (s.q.length) {
+        const w = s.q.shift(); w.state = 'ready'; w.blockedOn = null; advance(w, w.prog[w.pc]);
+        msg = `${th.name} calls sem_post(&${s.name}). ${w.name} was blocked on it, so ${w.name} wakes and gets through its sem_wait.`;
+      } else { s.v++; msg = `${th.name} calls sem_post(&${s.name}): ${s.v - 1} → ${s.v}.`; }
+      advance(th, ins);
+      break;
+    }
+    case 'print': {
+      const text = typeof ins.text === 'function' ? ins.text(th, S) : ins.text;
+      S.out.push({ th, text }); msg = `${th.name} prints "${text}".`; advance(th, ins);
+      break;
+    }
+    case 'sleep':
+      th.state = 'sleep'; th.sleepFrom = S.t; th.wake = S.t + ins.ticks; advance(th, ins);
+      msg = `${th.name} calls sleep(1) and gives up the CPU for a while.`;
+      break;
+    case 'do': advance(th, ins); break;
+    case 'if': {
+      const c = ins.cond(th, S);
+      th.pc = c ? th.pc + 1 : ins.elseTo;
+      msg = ins.say ? ins.say(th, S, c) : '';
+      break;
+    }
+    case 'end': th.state = 'done'; msg = `${th.name} returns NULL and the thread finishes.`; break;
+  }
+  if (ins.fx) { const m = ins.fx(th, S); if (typeof m === 'string') msg = m; }
+  S.msg = msg;
+}
+function step(S, chosen, pick) {
+  if (S.status !== 'running') return;
+  S.t++;
+  for (const th of S.threads) if (th.state === 'sleep' && th.wake <= S.t) th.state = 'ready';
+  const ready = S.threads.filter(t => t.state === 'ready');
+  if (!ready.length) {
+    S.last = null;
+    S.msg = 'No thread can run right now. The clock ticks while the sleeping threads wait to wake up.';
+    return;
+  }
+  const th = chosen && chosen.state === 'ready' ? chosen
+           : pick ? pick(ready, S) : ready[Math.random() * ready.length | 0];
+  exec(S, th); S.cur = th; S.steps++;
+  if (S.after) S.after(S);
+  if (S.threads.every(t => t.state === 'done')) S.status = 'done';
+  else if (!S.threads.some(t => t.state === 'ready' || t.state === 'sleep')) S.status = 'deadlock';
+}
+
+/* ---------- demo UI ---------- */
+const TEMPLATE = `
+<div class="panel">
+  <div class="sim-top">
+    <div class="row">
+      <button class="btn primary" data-act="play">▶ Run</button>
+      <button class="btn" data-act="step">Step</button>
+      <button class="btn" data-act="reset">↺ Reset</button>
+      <label class="ctl">Speed <input type="range" min="0" max="100" value="50" data-act="speed"></label>
+    </div>
+    <div class="opts"></div>
+  </div>
+  <div class="stage-head"><span class="verdict pending">Ready</span><span class="clock mono">t = 0</span></div>
+  <div class="stage"></div>
+  <div class="dgrid">
+    <div><div class="lbl">Code: click a chip to run that thread's next step</div><div class="codebox"></div></div>
+    <div>
+      <div class="lbl">Semaphores</div><div class="sems"></div>
+      <div class="lbl gap">Threads</div><div class="threads"></div>
+    </div>
+  </div>
+  <div class="narration"></div>
+  <div class="lbl gap">stdout</div><div class="console"></div>
+  <div class="extra"></div>
+</div>`;
+
+const STATE_TXT = th => th.state === 'blocked' ? `blocked on ${th.blockedOn}`
+  : th.state === 'sleep' ? 'sleeping' : th.state;
+
+function mountDemo(def) {
+  const host = document.querySelector(`[data-demo="${def.id}"]`);
+  host.innerHTML = TEMPLATE;
+  const $ = s => host.querySelector(s);
+  const opts = { ...def.defaults };
+  let S, timer = null, vs = {}, lineEls = [];
+  const playBtn = $('[data-act=play]'), speedEl = $('[data-act=speed]');
+
+  def.options.forEach(o => {
+    const wrap = document.createElement('div'); wrap.className = 'optgrp';
+    if (o.label) wrap.innerHTML = `<span class="optlbl">${o.label}</span>`;
+    const seg = document.createElement('div'); seg.className = 'seg';
+    o.choices.forEach(([v, label, cls]) => {
+      const b = document.createElement('button');
+      b.textContent = label; if (cls) b.classList.add(cls);
+      if (String(opts[o.key]) === String(v)) b.classList.add('on');
+      b.onclick = () => {
+        opts[o.key] = v;
+        seg.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+        rebuild();
+      };
+      seg.appendChild(b);
+    });
+    wrap.appendChild(seg); $('.opts').appendChild(wrap);
+  });
+
+  function rebuild() {
+    stop();
+    const built = def.build(opts);
+    S = createSim(built); vs = {};
+    const box = $('.codebox'); box.innerHTML = '';
+    lineEls = built.code.map((raw, i) => {
+      const off = raw.startsWith('-'), src = off ? raw.slice(1) : raw;
+      const el = document.createElement('div'); el.className = 'ln' + (off ? ' off' : '');
+      el.innerHTML = `<div class="chips"></div><div class="no">${i + 1}</div><div class="src">${hl(src) || ' '}</div>`;
+      box.appendChild(el);
+      return { el, chips: el.firstChild };
+    });
+    S.msg = def.hint;
+    render();
+  }
+  const delay = () => Math.round(1400 * Math.pow(0.04, speedEl.value / 100));
+  function stop() { clearTimeout(timer); timer = null; playBtn.textContent = '▶ Run'; }
+  function tick() {
+    step(S); render();
+    if (S.status !== 'running') { stop(); return; }
+    timer = setTimeout(tick, delay());
+  }
+  playBtn.onclick = () => {
+    if (timer) { stop(); return; }
+    if (S.status !== 'running') rebuild();
+    playBtn.textContent = '❚❚ Pause';
+    tick();
+  };
+  $('[data-act=step]').onclick = () => { stop(); step(S); render(); };
+  $('[data-act=reset]').onclick = rebuild;
+  host.addEventListener('click', e => {
+    const b = e.target.closest('[data-tid]');
+    if (!b || b.disabled) return;
+    stop(); step(S, S.threads[+b.dataset.tid]); render();
+  });
+
+  function verdict() {
+    const c = def.check(S, opts);
+    if (S.status === 'deadlock') return { cls: 'bad', text: 'Deadlock: ' + def.deadlock(S, opts) };
+    if (c) return c;
+    if (S.status === 'done') return { cls: 'ok', text: 'Finished' };
+    return { cls: 'pending', text: S.steps ? 'Running…' : 'Ready' };
+  }
+
+  function render() {
+    const v = verdict(), vEl = $('.verdict');
+    vEl.className = 'verdict ' + v.cls; vEl.textContent = v.text;
+    $('.clock').textContent = `t = ${S.t} · ${S.steps} steps`;
+    def.stage(S, $('.stage'), vs, opts);
+
+    lineEls.forEach(l => { l.chips.innerHTML = ''; l.el.classList.remove('flash'); });
+    if (S.last && lineEls[S.last.line]) lineEls[S.last.line].el.classList.add('flash');
+    const live = S.status === 'running';
+    S.threads.forEach(th => {
+      if (th.state === 'done') return;
+      const ins = th.prog[th.pc];
+      const c = document.createElement('button');
+      c.className = `chip ${th.state}` + (S.last && S.last.th === th ? ' last' : '');
+      c.style.setProperty('--c', th.color);
+      c.textContent = th.short + (th.state === 'sleep' ? ' zz' : '');
+      c.title = `${th.name}: ${STATE_TXT(th)}`;
+      c.disabled = !live || th.state !== 'ready';
+      c.dataset.tid = th.id;
+      lineEls[ins.line].chips.appendChild(c);
+    });
+
+    const names = Object.keys(S.sems);
+    $('.sems').innerHTML = names.length ? names.map(n => {
+      const s = S.sems[n];
+      return `<div class="sem"><div class="sem-head"><span class="sem-name">${n}</span><span class="sem-val">${s.v}</span></div>
+        <div class="sem-q">${s.q.length ? 'blocked: ' + s.q.map(t => `<span class="tag" style="--c:${t.color}">${esc(t.short)}</span>`).join('') : 'nobody waiting'}</div></div>`;
+    }).join('') : '<div class="empty">This version has no semaphores.</div>';
+
+    $('.threads').innerHTML = S.threads.map(th => {
+      const regs = th.regs ? Object.entries(th.regs).map(([k, x]) => `${k}=${x}`).join(' ') : '';
+      return `<div class="trow${S.last && S.last.th === th ? ' last' : ''}" style="--c:${th.color}">
+        <span class="dot"></span><b>${esc(th.name)}</b><span class="st ${th.state}">${STATE_TXT(th)}</span>
+        ${regs ? `<span class="regs mono">${regs}</span>` : ''}
+        <button class="btn sm" data-tid="${th.id}" ${!live || th.state !== 'ready' ? 'disabled' : ''}>Step ▸</button></div>`;
+    }).join('');
+
+    $('.narration').textContent = S.msg;
+    const con = $('.console');
+    con.innerHTML = S.out.length
+      ? S.out.map(o => `<div class="o" style="--c:${o.th.color}"><i></i>${esc(o.text)}</div>`).join('')
+      : '<div class="none">(nothing printed yet)</div>';
+    con.scrollTop = con.scrollHeight;
+  }
+
+  if (def.extra) def.extra($('.extra'), opts);
+  rebuild();
+}
+
+/* ---------- 01 serialization ---------- */
+const serialization = {
+  id: 'serialization', defaults: { mode: 'sem' },
+  options: [{ key: 'mode', choices: [['sem', 'With semaphore', 'ok'], ['none', 'Without semaphore', 'bad']] }],
+  hint: 'Press Run, or click a chip in the code to pick which thread runs next. Try running B first.',
+  build(o) {
+    const sem = o.mode === 'sem', off = sem ? '' : '-';
+    const { code, ln } = CB();
+    ln('void *A(void *arg) {');
+    const a1 = ln('    sleep(1);');
+    const a2 = ln('    printf("A: boil water\\n");');
+    const a3 = ln(off + '    sem_post(&done);      /* signal: A is done */');
+    const a4 = ln('    return NULL;'); ln('}');
+    ln('void *B(void *arg) {');
+    const b1 = ln(off + '    sem_wait(&done);      /* wait for A\'s signal */');
+    const b2 = ln('    printf("B: pour tea\\n");');
+    const b3 = ln('    return NULL;'); ln('}');
+    return {
+      code, sems: sem ? { done: 0 } : {}, shared: {},
+      threads: [
+        { name: 'A', prog: [
+          { line: a1, op: 'sleep', ticks: 6 },
+          { line: a2, op: 'print', text: 'A: boil water', fx: (t, S) => { S.shared.boiled = true; } },
+          sem && { line: a3, op: 'post', sem: 'done' },
+          { line: a4, op: 'end' }] },
+        { name: 'B', prog: [
+          sem && { line: b1, op: 'wait', sem: 'done' },
+          { line: b2, op: 'print', text: 'B: pour tea', fx: (t, S) => { S.shared.poured = true; S.shared.hot = !!S.shared.boiled; } },
+          { line: b3, op: 'end' }] }
+      ]
+    };
+  },
+  check(S) {
+    const sh = S.shared;
+    if (sh.poured && !sh.hot) return { cls: 'bad', text: 'B poured before the water boiled' };
+    if (S.status === 'done') return { cls: 'ok', text: 'B poured only after A boiled the water' };
+    return null;
+  },
+  deadlock: () => 'every thread is blocked.',
+  stage(S, el) {
+    const [A, B] = S.threads, sh = S.shared, d = S.sems.done;
+    const p = sh.boiled ? 100 : A.state === 'sleep' ? Math.min(100, Math.round(100 * (S.t - A.sleepFrom) / (A.wake - A.sleepFrom))) : 0;
+    const kettle = sh.boiled ? 'Boiled' : A.state === 'sleep' ? 'Heating…' : 'Cold';
+    const cup = sh.poured ? (sh.hot ? 'Tea poured' : 'Cold water poured!') : B.state === 'blocked' ? 'Waiting for the signal' : 'Empty';
+    el.innerHTML = `<div class="duo">
+      <div class="station${sh.boiled ? ' good' : ''}" style="--c:${A.color}"><div class="st-k">Thread A · kettle</div><div class="st-v">${kettle}</div><div class="meter"><i style="width:${p}%"></i></div></div>
+      <div class="link"><div class="arrow">⟶</div><div class="mono">${d ? `done = ${d.v}` : 'no signal'}</div></div>
+      <div class="station${sh.poured ? (sh.hot ? ' good' : ' bad') : ''}" style="--c:${B.color}"><div class="st-k">Thread B · cup</div><div class="st-v">${cup}</div><div class="meter"><i style="width:${sh.poured ? 100 : 0}%"></i></div></div>
+    </div>`;
+  }
+};
+
+/* ---------- 02 rendezvous ---------- */
+const rendezvous = {
+  id: 'rendezvous', defaults: { mode: 'ok' },
+  options: [{ key: 'mode', choices: [['ok', 'Signal, then wait', 'ok'], ['deadlock', 'Wait, then signal', 'bad'], ['none', 'No semaphores', 'bad']] }],
+  hint: 'Bob sleeps before arriving. Step through and watch Alice block on bob_here until Bob signals.',
+  build(o) {
+    const swap = o.mode === 'deadlock', on = o.mode !== 'none', off = on ? '' : '-';
+    const { code, ln } = CB();
+    const aPostT = off + '    sem_post(&alice_here);    /* announce */', aWaitT = off + '    sem_wait(&bob_here);      /* wait for Bob */';
+    const bPostT = off + '    sem_post(&bob_here);', bWaitT = off + '    sem_wait(&alice_here);';
+    ln('void *alice(void *arg) {');
+    const a1 = ln('    printf("Alice arrives\\n");');
+    const aX = ln(swap ? aWaitT : aPostT), aY = ln(swap ? aPostT : aWaitT);
+    const a4 = ln('    printf("Alice leaves\\n");'), a5 = ln('    return NULL;'); ln('}');
+    ln('void *bob(void *arg) {');
+    const b0 = ln('    sleep(1);'), b1 = ln('    printf("Bob arrives\\n");');
+    const bX = ln(swap ? bWaitT : bPostT), bY = ln(swap ? bPostT : bWaitT);
+    const b4 = ln('    printf("Bob leaves\\n");'), b5 = ln('    return NULL;'); ln('}');
+    const aPost = { op: 'post', sem: 'alice_here', line: swap ? aY : aX }, aWait = { op: 'wait', sem: 'bob_here', line: swap ? aX : aY };
+    const bPost = { op: 'post', sem: 'bob_here', line: swap ? bY : bX }, bWait = { op: 'wait', sem: 'alice_here', line: swap ? bX : bY };
+    const arrive = who => (t, S) => { S.shared.arrived[who] = true; };
+    const leave = (who, other) => (t, S) => {
+      S.shared.left[who] = true;
+      if (!S.shared.arrived[other] && !S.shared.bad) S.shared.bad = `${who} left before ${other} arrived`;
+    };
+    const mid = (post, wait) => on ? (swap ? [wait, post] : [post, wait]) : [];
+    return {
+      code, sems: on ? { alice_here: 0, bob_here: 0 } : {}, shared: { arrived: {}, left: {} },
+      threads: [
+        { name: 'Alice', prog: [
+          { line: a1, op: 'print', text: 'Alice arrives', fx: arrive('Alice') },
+          ...mid(aPost, aWait),
+          { line: a4, op: 'print', text: 'Alice leaves', fx: leave('Alice', 'Bob') },
+          { line: a5, op: 'end' }] },
+        { name: 'Bob', prog: [
+          { line: b0, op: 'sleep', ticks: 6 },
+          { line: b1, op: 'print', text: 'Bob arrives', fx: arrive('Bob') },
+          ...mid(bPost, bWait),
+          { line: b4, op: 'print', text: 'Bob leaves', fx: leave('Bob', 'Alice') },
+          { line: b5, op: 'end' }] }
+      ]
+    };
+  },
+  check(S) {
+    if (S.shared.bad) return { cls: 'bad', text: S.shared.bad };
+    if (S.status === 'done') return { cls: 'ok', text: 'Both arrived before either one left' };
+    return null;
+  },
+  deadlock: () => 'each thread is waiting for a signal the other never sends.',
+  stage(S, el) {
+    const sh = S.shared;
+    const zone = (i, title, cls) => {
+      const people = S.threads.filter(th => (sh.left[th.name] ? 2 : sh.arrived[th.name] ? 1 : 0) === i);
+      return `<div class="zone ${cls}"><h4>${title}</h4>${people.map(th => {
+        const sub = th.state === 'blocked' ? `waiting on ${th.blockedOn}` : th.state === 'sleep' ? 'still on the way (sleep)'
+          : th.state === 'done' ? 'thread finished' : 'running';
+        return `<div class="person" style="--c:${th.color}"><b>${th.name}</b><small>${sub}</small></div>`;
+      }).join('')}</div>`;
+    };
+    el.innerHTML = `<div class="zones">${zone(0, 'On the way', '')}${zone(1, 'Meeting point', 'meet')}${zone(2, 'Left', '')}</div>`;
+  }
+};
+
+/* ---------- 03 ping-pong ---------- */
+const pingpong = {
+  id: 'pingpong', defaults: { init: '10' },
+  options: [{ key: 'init', label: 'Initial (ping_turn, pong_turn):', choices: [['10', '(1, 0)', 'ok'], ['00', '(0, 0)', 'bad'], ['11', '(1, 1)', 'bad']] }],
+  hint: 'Only the thread holding the turn can get past its sem_wait. Try stepping pong first.',
+  build(o) {
+    const [pi, po] = o.init.split('').map(Number);
+    const { code, ln } = CB();
+    ln('/* in main(): */');
+    ln(`sem_init(&ping_turn, 0, ${pi});  sem_init(&pong_turn, 0, ${po});`);
+    const mk = (name, mine, other) => {
+      ln(''); ln(`void *${name}(void *arg) {`);
+      const lf = ln('    for (int i = 0; i < 5; i++) {');
+      const lw = ln(`        sem_wait(&${mine});`);
+      const lp = ln(`        printf("${name}\\n");`);
+      const ls = ln(`        sem_post(&${other});`);
+      ln('    }'); const lr = ln('    return NULL;'); ln('}');
+      return { name, locals: { i: 0 }, prog: [
+        { label: 'top', line: lf, op: 'if', cond: t => t.L.i < 5, elseTo: 'end',
+          say: (t, S, c) => c ? `${name}: i = ${t.L.i} < 5, so it starts another round.` : `${name}: i = 5, so the loop ends.` },
+        { line: lw, op: 'wait', sem: mine },
+        { line: lp, op: 'print', text: name, fx: (t, S) => { S.shared.seq.push(name); } },
+        { line: ls, op: 'post', sem: other },
+        { line: lf, op: 'do', to: 'top', fx: t => { t.L.i++; return `${name}: i++ → ${t.L.i}.`; } },
+        { label: 'end', line: lr, op: 'end' }] };
+    };
+    const a = mk('ping', 'ping_turn', 'pong_turn'), b = mk('pong', 'pong_turn', 'ping_turn');
+    return { code, sems: { ping_turn: pi, pong_turn: po }, shared: { seq: [] }, threads: [a, b] };
+  },
+  check(S) {
+    const seq = S.shared.seq;
+    const k = seq.findIndex((n, i) => n !== (i % 2 ? 'pong' : 'ping'));
+    if (k >= 0) return { cls: 'bad', text: `Out of turn at print #${k + 1}: "${seq[k]}"` };
+    if (S.status === 'done') return { cls: 'ok', text: 'Perfect alternation: ping pong × 5' };
+    return null;
+  },
+  deadlock: () => 'neither thread holds the turn, so both block in sem_wait.',
+  stage(S, el, vs) {
+    const [P, Q] = S.threads, seq = S.shared.seq;
+    if (!vs.init) {
+      el.innerHTML = `<div class="pp-table">
+        <div class="paddle" style="--c:${P.color}">ping<small></small></div>
+        <div class="court"><div class="net"></div><div class="ball" style="left:50%"></div></div>
+        <div class="paddle" style="--c:${Q.color}">pong<small></small></div></div><div class="seq"></div>`;
+      vs.init = true;
+    }
+    const last = seq[seq.length - 1];
+    el.querySelector('.ball').style.left = last === 'ping' ? '88%' : last === 'pong' ? '12%' : '50%';
+    const smalls = el.querySelectorAll('.paddle small');
+    [P, Q].forEach((th, i) => { smalls[i].textContent = STATE_TXT(th).replace('blocked on ', 'waits ').replace('_turn', ''); });
+    let chips = seq.map((n, i) => `<span class="pp${n !== (i % 2 ? 'pong' : 'ping') ? ' bad' : ''}" style="--c:${n === 'ping' ? P.color : Q.color}">${n}</span>`).join('');
+    for (let i = seq.length; i < 10; i++) chips += `<span class="pp slot">${i % 2 ? 'pong' : 'ping'}</span>`;
+    el.querySelector('.seq').innerHTML = chips;
+  }
+};
+
+/* ---------- 04 tickets ---------- */
+const tickets = {
+  id: 'tickets', defaults: { mode: 'mutex', n: '10' },
+  options: [
+    { key: 'mode', choices: [['mutex', 'With mutex', 'ok'], ['race', 'No mutex', 'bad'], ['forget', 'Forget sem_post when sold out', 'bad']] },
+    { key: 'n', label: 'Tickets:', choices: [['5', '5'], ['10', '10'], ['20', '20']] }],
+  hint: 'Each seller holds its own register copies (r, s). Without the mutex, try loading on A, then on B, then storing both.',
+  build(o) {
+    const n = +o.n, mode = o.mode, sem = mode !== 'race', off = sem ? '' : '-';
+    const { code, ln } = CB();
+    ln('void *seller(void *arg) {');
+    ln('    while (1) {');
+    const lw = ln(off + '        sem_wait(&mutex);            /* one seller at a time */');
+    const lif = ln('        if (tickets <= 0) {');
+    const lrel = ln((mode === 'mutex' ? '' : '-') + '            sem_post(&mutex);        ' +
+                    (mode === 'forget' ? '/* forgotten: never released */' : '/* sold out: release first! */'));
+    const lret = ln('            return NULL;'); ln('        }');
+    const ldec = ln('        tickets--;                   /* load, then store */');
+    const linc = ln('        sold++;                      /* load, then store */');
+    const lpost = ln(off + '        sem_post(&mutex);');
+    ln('    }'); ln('}');
+    const mk = name => {
+      const prog = [
+        sem && { line: lw, op: 'wait', sem: 'mutex' },
+        { line: lif, op: 'if', cs: 1, cond: (t, S) => S.shared.tickets <= 0, elseTo: 'sell',
+          say: (t, S, c) => c ? `${t.name} sees tickets = ${S.shared.tickets}: sold out.` : `${t.name} sees tickets = ${S.shared.tickets} > 0, so there is one to sell.` },
+        mode === 'mutex' && { line: lrel, op: 'post', sem: 'mutex', cs: 1 },
+        { line: lret, op: 'end' },
+        { label: 'sell', line: ldec, op: 'do', cs: 1, fx: (t, S) => { t.regs.r = S.shared.tickets; return `${t.name} loads tickets (${t.regs.r}) into register r.`; } },
+        { line: ldec, op: 'do', cs: 1, fx: (t, S) => {
+            S.shared.tickets = t.regs.r - 1; S.shared.served++; S.shared.order.push(t.id);
+            return `${t.name} stores r − 1 = ${t.regs.r - 1} into tickets and hands a ticket to a customer.`; } },
+        { line: linc, op: 'do', cs: 1, fx: (t, S) => { t.regs.s = S.shared.sold; return `${t.name} loads sold (${t.regs.s}) into register s.`; } },
+        { line: linc, op: 'do', cs: 1, fx: (t, S) => { S.shared.sold = t.regs.s + 1; return `${t.name} stores s + 1 = ${t.regs.s + 1} into sold.`; } },
+        sem && { line: lpost, op: 'post', sem: 'mutex', cs: 1 }
+      ].filter(Boolean);
+      prog[prog.length - 1].to = 0;
+      return { name, short: name.slice(-1), prog, regs: { r: '–', s: '–' } };
+    };
+    return { code, sems: sem ? { mutex: 1 } : {}, shared: { n, tickets: n, sold: 0, served: 0, order: [] },
+             threads: [mk('Seller A'), mk('Seller B')] };
+  },
+  check(S) {
+    const sh = S.shared;
+    if (sh.tickets < 0) return { cls: 'bad', text: `Oversold: tickets = ${sh.tickets}` };
+    if (S.status === 'done') {
+      return sh.served === sh.n && sh.sold === sh.n && sh.tickets === 0
+        ? { cls: 'ok', text: `Correct: sold = ${sh.sold}, left = 0` }
+        : { cls: 'bad', text: `sold = ${sh.sold}, left = ${sh.tickets}, but ${sh.served} customers got tickets` };
+    }
+    if (inCS(S).length > 1) return { cls: 'warn', text: 'Both sellers are inside the critical section' };
+    return null;
+  },
+  deadlock: S => {
+    const gone = S.threads.find(t => t.state === 'done');
+    return `${gone ? gone.name : 'a seller'} returned while still holding the mutex, so the other seller waits forever.`;
+  },
+  stage(S, el) {
+    const sh = S.shared, inside = inCS(S);
+    const lost = sh.served - sh.sold;
+    const ok = sh.served === sh.sold && sh.sold + sh.tickets === sh.n && sh.tickets >= 0;
+    let stubs = '';
+    for (let k = 0; k < Math.max(sh.n, sh.served); k++) {
+      const by = sh.order[k];
+      stubs += by != null
+        ? `<span class="stub sold${k >= sh.n ? ' over' : ''}" style="--c:${S.threads[by].color}">${S.threads[by].short}</span>`
+        : `<span class="stub">${k + 1}</span>`;
+    }
+    el.innerHTML = `<div class="tiles">
+        <div class="tile"><span>Customers served (truth)</span><b>${sh.served}</b></div>
+        <div class="tile${sh.sold !== sh.served ? ' bad' : ''}"><span><code>sold</code> says</span><b>${sh.sold}</b></div>
+        <div class="tile${sh.tickets < 0 || sh.tickets !== sh.n - sh.served ? ' bad' : ''}"><span><code>tickets</code> left says</span><b>${sh.tickets}</b></div>
+        <div class="tile${ok ? '' : ' bad'}"><span>sold + left = ${sh.n}?</span><b>${ok ? '✓' : '✗'}</b></div>
+      </div>
+      <div class="stubs">${stubs}</div>
+      <div class="csbar${inside.length > 1 ? ' bad' : ''}">Critical section: ${inside.length ? inside.map(t => t.name).join(' and ') + (inside.length > 1 ? ' at the same time!' : ' is inside') : 'empty'}${lost > 0 ? ` · ${lost} lost update${lost > 1 ? 's' : ''} to <code>sold</code>` : ''}</div>`;
+  },
+  extra(el, opts) {
+    el.innerHTML = `<div class="fast"><button class="btn">Run the full 100,000 tickets</button><span class="fast-out mono">Uses the mode selected above, with random preemption.</span></div>`;
+    const btn = el.querySelector('button'), out = el.querySelector('.fast-out');
+    btn.onclick = () => {
+      btn.disabled = true; out.textContent = 'running…';
+      setTimeout(() => {
+        const S = createSim(tickets.build({ mode: opts.mode, n: 100000 }));
+        // a real scheduler lets a thread run for a while before preempting it
+        const pick = (ready, S) => S.cur && S.cur.state === 'ready' && Math.random() < 0.9 ? S.cur : ready[Math.random() * ready.length | 0];
+        for (let k = 0; S.status === 'running' && k < 5e6; k++) step(S, null, pick);
+        const sh = S.shared, good = sh.sold === 100000 && sh.tickets === 0 && S.status === 'done';
+        out.innerHTML = (S.status === 'deadlock' ? '<b style="color:var(--bad)">program hangs (deadlock)</b> · ' : '') +
+          `sold = ${sh.sold}, left = ${sh.tickets} (expected 100000, 0) ` +
+          `<span class="verdict ${good ? 'ok' : 'bad'}">${good ? 'correct' : 'wrong'}</span>`;
+        btn.disabled = false;
+      }, 30);
+    };
+  }
+};
+const inCS = S => S.threads.filter(t => t.state !== 'done' && t.state !== 'blocked' && t.prog[t.pc] && t.prog[t.pc].cs);
+
+/* ---------- 05 parking ---------- */
+const parking = {
+  id: 'parking', defaults: { spots: '3', cars: '6', mode: 'sem' },
+  options: [
+    { key: 'mode', choices: [['sem', 'With semaphore', 'ok'], ['none', 'No semaphore', 'bad']] },
+    { key: 'spots', label: 'Spots:', choices: [['1', '1'], ['2', '2'], ['3', '3'], ['4', '4']] },
+    { key: 'cars', label: 'Cars:', choices: [['4', '4'], ['6', '6'], ['8', '8']] }],
+  hint: 'Every car tries to take a spot. Once the semaphore reaches 0, the next cars queue at the gate.',
+  build(o) {
+    const spots = +o.spots, cars = +o.cars, sem = o.mode === 'sem', off = sem ? '' : '-';
+    const { code, ln } = CB();
+    ln('/* in main(): */');
+    ln(off + `sem_init(&spots, 0, ${spots});       /* lot has ${spots} spot${spots > 1 ? 's' : ''} */`);
+    ln('');
+    ln('void *car(void *arg) {');
+    const w = ln(off + '    sem_wait(&spots);   /* take a spot; blocks if lot is full */');
+    const p1 = ln('    printf("Car %ld parks\\n", (long)arg);');
+    const sl = ln('    sleep(1);');
+    const p2 = ln('    printf("Car %ld leaves\\n", (long)arg);');
+    const po = ln(off + '    sem_post(&spots);   /* free the spot */');
+    const r = ln('    return NULL;'); ln('}');
+    const threads = [];
+    for (let i = 0; i < cars; i++) {
+      const prog = [
+        sem && { line: w, op: 'wait', sem: 'spots' },
+        { line: p1, op: 'print', text: `Car ${i} parks` },
+        { line: sl, op: 'sleep', ticks: 10 },
+        { line: p2, op: 'print', text: `Car ${i} leaves` },
+        sem && { line: po, op: 'post', sem: 'spots' },
+        { line: r, op: 'end' }].filter(Boolean);
+      // the car occupies the lot while enter < pc <= exit
+      const enter = sem ? 0 : prog.findIndex(x => x.line === p1);
+      const exit = sem ? prog.findIndex(x => x.op === 'post') : prog.findIndex(x => x.line === p2);
+      threads.push({ name: `Car ${i}`, short: `C${i}`, prog, meta: { enter, exit } });
+    }
+    return { code, sems: sem ? { spots } : {}, shared: { spots, peak: 0, inLot: 0 }, threads,
+      after: S => { const k = S.threads.filter(inLot).length; S.shared.inLot = k; S.shared.peak = Math.max(S.shared.peak, k); } };
+  },
+  check(S) {
+    const sh = S.shared;
+    if (sh.inLot > sh.spots) return { cls: 'bad', text: `Lot overflow: ${sh.inLot} cars in ${sh.spots} spot${sh.spots > 1 ? 's' : ''}` };
+    if (S.status === 'done') return sh.peak <= sh.spots
+      ? { cls: 'ok', text: `All cars parked, never more than ${sh.spots} at once` }
+      : { cls: 'bad', text: `Lot overflowed (peak ${sh.peak} cars, ${sh.spots} spots)` };
+    return null;
+  },
+  deadlock: () => 'every car is blocked.',
+  stage(S, el, vs) {
+    const sh = S.shared;
+    vs.assign = vs.assign || {};
+    const carEl = (th, cls = '') => `<span class="car ${cls}" style="--c:${th.color}">${th.name}${th.state === 'sleep' ? ' zz' : ''}</span>`;
+    const road = [], queue = [], lot = [], gone = [];
+    S.threads.forEach(th => {
+      if (th.state === 'blocked') queue.push(th);
+      else if (inLot(th)) lot.push(th);
+      else if (th.pc <= th.meta.enter) road.push(th);
+      else gone.push(th);
+    });
+    // keep each parked car in the same drawn spot
+    for (const id in vs.assign) if (!lot.some(t => t.id === +id)) delete vs.assign[id];
+    const taken = new Set(Object.values(vs.assign));
+    const overflow = [];
+    lot.forEach(th => {
+      if (th.id in vs.assign) return;
+      let s = 0; while (s < sh.spots && taken.has(s)) s++;
+      if (s < sh.spots) { vs.assign[th.id] = s; taken.add(s); } else overflow.push(th);
+    });
+    let spotsHtml = '';
+    for (let s = 0; s < sh.spots; s++) {
+      const id = Object.keys(vs.assign).find(k => vs.assign[k] === s);
+      spotsHtml += id != null ? `<div class="spot full">${carEl(S.threads[id])}</div>` : `<div class="spot">P${s + 1}</div>`;
+    }
+    const lane = (title, list, cls, carCls) => `<div class="lane ${cls}"><h4>${title}</h4><div class="cars">${list.map(t => carEl(t, carCls)).join('')}</div></div>`;
+    const sem = S.sems.spots;
+    el.innerHTML = `<div class="lot">
+      ${lane('Arriving', road, '', '')}
+      ${lane('Gate queue (blocked)', queue, 'gate', 'wait')}
+      <div class="lane park"><h4>Parking lot · ${sh.spots} spot${sh.spots > 1 ? 's' : ''}</h4><div class="spots">${spotsHtml}</div>
+        ${overflow.length ? `<div class="overflow">No spot left! Double-parked:<div class="cars">${overflow.map(t => carEl(t)).join('')}</div></div>` : ''}</div>
+      ${lane('Left', gone, '', 'gone')}
+    </div>
+    <div class="lotstats"><span>In lot now: <b>${lot.length}</b> / ${sh.spots}</span><span>Peak: <b>${sh.peak}</b></span>
+      <span>Free (semaphore): <b>${sem ? sem.v : '—'}</b></span><span>Waiting: <b>${queue.length}</b></span></div>`;
+  }
+};
+const inLot = th => th.state !== 'done' && th.pc > th.meta.enter && th.pc <= th.meta.exit;
+
+[serialization, rendezvous, pingpong, tickets, parking].forEach(mountDemo);
+
+/* ---------- original sources ---------- */
+document.querySelectorAll('pre[data-src]').forEach(pre => {
+  const raw = document.getElementById('src-' + pre.dataset.src).textContent;
+  pre.innerHTML = raw.split('\n').map(hl).join('\n');
+});
+
+/* ---------- theme toggle ---------- */
+document.getElementById('themeBtn').addEventListener('click', () => {
+  const root = document.documentElement;
+  const cur = root.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  root.dataset.theme = cur === 'dark' ? 'light' : 'dark';
+  try { localStorage.setItem('sem-theme', root.dataset.theme); } catch (e) {}
+});
+try { const t = localStorage.getItem('sem-theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+</script>
+</body>
+</html>
