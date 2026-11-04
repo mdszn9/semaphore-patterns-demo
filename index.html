@@ -201,6 +201,7 @@ input[type=range] { accent-color: var(--prod); width: 110px; }
 .st.ready { color: var(--ok); background: var(--ok-soft); }
 .st.blocked { color: var(--bad); background: var(--bad-soft); }
 .st.sleep { color: var(--warn); background: var(--warn-soft); }
+.st.woken { color: var(--mem); background: var(--mem-soft); }
 .st.running { color: var(--on-c); background: var(--c); }
 
 /* machine: CPU + locks + thread cards */
@@ -237,6 +238,14 @@ input[type=range] { accent-color: var(--prod); width: 110px; }
 .qchip { --c: var(--t0); font: 700 11px Inter, sans-serif; background: var(--c); color: var(--on-c); padding: 1px 8px; border-radius: 999px; border: 2px solid var(--c); white-space: nowrap; }
 .qchip.wait { background: transparent; color: var(--c); border-style: dashed; }
 .qchip.sleep { opacity: .55; }
+.qchip.woke { background: transparent; color: var(--c); border-style: dotted; }
+.wk-note { font-size: 11px; color: var(--mem); margin-left: 2px; }
+.tl.cur.woken { background: color-mix(in srgb, var(--mem) 18%, transparent); }
+.tl.cur.woken .pc { color: var(--mem); }
+.lk-log { grid-column: 1 / -1; margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--border); font: 11px/1.6 "JetBrains Mono", monospace; color: var(--muted); }
+.lk-log > div { opacity: .6; padding: 1px 0; }
+.lk-log > div.new { opacity: 1; color: var(--text); }
+.stepn { font: 800 9.5px Inter, sans-serif; letter-spacing: .05em; text-transform: uppercase; color: var(--mem); background: var(--mem-soft); border-radius: 999px; padding: 0 6px; margin-right: 6px; white-space: nowrap; }
 .qnone { font-style: italic; font-size: 12px; }
 .cpu-tl { display: grid; grid-template-columns: repeat(40, 1fr); gap: 1px; margin-top: 10px; height: 14px; }
 .cpu-tl i { background: var(--surface-2); border-radius: 2px; }
@@ -429,7 +438,7 @@ footer { padding: 40px 0 60px; color: var(--muted); font-size: 14px; border-top:
 <div class="wrap">
   <div class="sec-num">00 · How to read the demos</div>
   <h2>A semaphore is a counter with a waiting line</h2>
-  <p class="sub">Every demo is laid out the same way. The <b>CPU</b> runs one thread at a time and shows the line it just executed. Each <b>thread</b> has a card with its own code: <b>▶</b> marks its next line (its program counter), a small lock means it is blocked on a semaphore, and <b>z</b> means it is sleeping. Each <b>semaphore</b> is drawn as a padlock: <b style="color:var(--ok)">unlocked</b> (green, shackle open) while its value is above 0, so <code>sem_wait</code> passes, and <b style="color:var(--bad)">locked</b> (red, shackle shut) at 0, so <code>sem_wait</code> blocks, with the threads blocked on it listed underneath. Threads that are not on the CPU wait in the ready queue, in a lock's queue, or asleep.</p>
+  <p class="sub">Every demo is laid out the same way. The <b>CPU</b> runs one thread at a time and shows the line it just executed. Each <b>thread</b> has a card with its own code: <b>▶</b> marks its next line (its program counter), a small lock means it is blocked on a semaphore, <b>↻</b> means a <code>sem_post</code> woke it and it still has to retry <code>sem_wait</code>, and <b>z</b> means it is sleeping. Each <b>semaphore</b> is drawn as a padlock: <b style="color:var(--ok)">unlocked</b> (green, shackle open) while its value is above 0, so <code>sem_wait</code> passes, and <b style="color:var(--bad)">locked</b> (red, shackle shut) at 0, so <code>sem_wait</code> blocks, with the threads blocked on it listed underneath. Threads that are not on the CPU wait in the ready queue, in a lock's queue, or asleep.</p>
   <div class="grid2">
     <div class="panel">
       <h3>The two operations</h3>
@@ -626,7 +635,7 @@ function compile(prog) {
 function createSim(spec) {
   const S = { t: 0, steps: 0, status: 'running', out: [], last: null, msg: '', cur: null, onCpu: null,
               switches: 0, tl: [], ev: null, shared: spec.shared || {}, sems: {}, after: spec.after };
-  for (const [k, v] of Object.entries(spec.sems)) S.sems[k] = { name: k, v, init: v, q: [], holders: [] };
+  for (const [k, v] of Object.entries(spec.sems)) S.sems[k] = { name: k, v, init: v, q: [], holders: [], log: [] };
   S.threads = spec.threads.map((t, i) => ({
     id: i, name: t.name, short: t.short || t.name, color: `var(--t${i % 8})`,
     prog: compile(t.prog.filter(Boolean)), pc: 0, state: 'ready', wake: 0, sleepFrom: 0, blockedOn: null,
@@ -634,6 +643,8 @@ function createSim(spec) {
   }));
   return S;
 }
+/* each lock remembers its last few operations; tag marks the two halves of a wake-up */
+function logLock(s, th, text, tag) { s.log.push({ th, text, tag }); if (s.log.length > 3) s.log.shift(); }
 const advance = (th, ins) => { th.pc = ins.to != null ? ins.to : th.pc + 1; };
 function exec(S, th) {
   const ins = th.prog[th.pc];
@@ -644,14 +655,21 @@ function exec(S, th) {
       const s = S.sems[ins.sem];
       if (s.v > 0) {
         s.v--; s.holders.push(th); advance(th, ins);
-        msg = th.woken
-          ? `${th.name} is back on the CPU and retries sem_wait(&${s.name}): ${s.v + 1} → ${s.v}, so it takes the unit and gets through.`
-          : `${th.name} calls sem_wait(&${s.name}): ${s.v + 1} → ${s.v}, and keeps going.`;
-        th.woken = false;
+        if (th.woken) {
+          S.ev = { k: 'retry', sem: s.name };
+          msg = `Step 2 of 2 · ${th.name} is back on the CPU and retries sem_wait(&${s.name}): ${s.v + 1} → ${s.v}. ` +
+                (s.v ? `${th.name} takes a unit and gets through.` : `${s.name} is locked again, and ${th.name} gets through.`);
+          logLock(s, th, `retries sem_wait: ${s.v + 1} → ${s.v}${s.v ? '' : ', locked'}`, 2);
+        } else {
+          msg = `${th.name} calls sem_wait(&${s.name}): ${s.v + 1} → ${s.v}, and keeps going.`;
+          logLock(s, th, `sem_wait: ${s.v + 1} → ${s.v}${s.v ? '' : ', locked'}`);
+        }
+        th.woken = null;
       }
       else {
-        th.state = 'blocked'; th.blockedOn = s.name; th.woken = false; s.q.push(th); S.ev = { k: 'block', sem: s.name };
+        th.state = 'blocked'; th.blockedOn = s.name; th.woken = null; s.q.push(th); S.ev = { k: 'block', sem: s.name };
         msg = `${th.name} calls sem_wait(&${s.name}), but it is 0, so ${th.name} blocks and leaves the CPU.`;
+        logLock(s, th, 'sem_wait: 0, blocks');
       }
       break;
     }
@@ -662,10 +680,12 @@ function exec(S, th) {
       msg = `${th.name} calls sem_post(&${s.name}): ${s.v - 1} → ${s.v}, so ${s.name} is unlocked.`;
       if (s.q.length) {
         // like POSIX: the woken thread stays on its sem_wait line and retries it when it next runs
-        const w = s.q.shift(); w.state = 'ready'; w.blockedOn = null; w.woken = true;
+        const w = s.q.shift(); w.state = 'ready'; w.blockedOn = null; w.woken = s.name;
         S.ev = { k: 'wake', sem: s.name, who: w };
-        msg += ` ${w.name} was blocked on it, so it wakes up and joins the ready queue. It will retry sem_wait when it next runs.`;
-      }
+        msg = `Step 1 of 2 · ${msg} ${w.name} was blocked on it, so it wakes up and joins the ready queue. ` +
+              `${w.name} has not passed yet: step 2 happens when it next gets the CPU and retries sem_wait.`;
+        logLock(s, th, `sem_post: ${s.v - 1} → ${s.v}, unlocked, wakes ${w.short}`, 1);
+      } else logLock(s, th, `sem_post: ${s.v - 1} → ${s.v}${s.v === 1 ? ', unlocked' : ''}`);
       advance(th, ins);
       break;
     }
@@ -744,6 +764,7 @@ const PADLOCK = `<svg class="padlock" viewBox="0 0 64 80" aria-hidden="true">
 const MINI_LOCK = `<svg class="mini-lock" viewBox="0 0 64 80" aria-hidden="true"><path d="M19 40 V25 a13 13 0 0 1 26 0 V40"/><rect x="5" y="36" width="54" height="42" rx="10"/></svg>`;
 
 const STATE_TXT = th => th.state === 'blocked' ? `blocked on ${th.blockedOn}`
+  : th.state === 'ready' && th.woken ? `woken · will retry sem_wait`
   : th.state === 'sleep' ? 'sleeping' : th.state;
 const stripCm = s => s.replace(/\s*\/\*.*?\*\/\s*$/, '');
 const unmark = s => s.replace(/^-/, '');
@@ -829,9 +850,11 @@ function mountDemo(def) {
       el.innerHTML = `<div class="lk-art">${PADLOCK}<span class="lk-state"></span></div><div class="lk-top"><span class="lk-name">${n}</span><span class="lk-val"></span></div>
         <div><div class="lk-tokens"></div><div class="lk-init mono">sem_init(&amp;${n}, 0, ${S.sems[n].init})</div></div>
         ${def.holders ? `<div class="lk-row"><span>${def.holders}</span><div class="qchips hold"></div></div>` : ''}
-        <div class="lk-row"><span>Blocked</span><div class="qchips wq"></div></div>`;
+        <div class="lk-row"><span>Blocked</span><div class="qchips wq"></div></div>
+        <div class="lk-row"><span>Woken</span><div class="qchips wk"></div></div>
+        <div class="lk-log"></div>`;
       locks.appendChild(el);
-      lockEls[n] = { el, open: null, state: el.querySelector('.lk-state'), val: el.querySelector('.lk-val'), tok: el.querySelector('.lk-tokens'), hold: el.querySelector('.hold'), wq: el.querySelector('.wq') };
+      lockEls[n] = { el, open: null, state: el.querySelector('.lk-state'), val: el.querySelector('.lk-val'), tok: el.querySelector('.lk-tokens'), hold: el.querySelector('.hold'), wq: el.querySelector('.wq'), wk: el.querySelector('.wk'), log: el.querySelector('.lk-log') };
     });
 
     cards = S.threads.map(th => {
@@ -858,7 +881,8 @@ function mountDemo(def) {
   function tick() {
     step(S, null, schedPick); render(delay() >= 300);
     if (S.status !== 'running') { stop(); return; }
-    timer = setTimeout(tick, delay());
+    const pause = S.ev && (S.ev.k === 'wake' || S.ev.k === 'retry');
+    timer = setTimeout(tick, pause ? Math.max(1400, delay() * 3) : delay());
   }
   playBtn.onclick = () => {
     if (timer) { stop(); return; }
@@ -935,6 +959,11 @@ function mountDemo(def) {
       L.tok.innerHTML = '<i></i>'.repeat(Math.min(s.v, 12));
       if (L.hold) L.hold.innerHTML = s.holders.length ? s.holders.map(t => qchip(t)).join('') : '<span class="qnone">nobody</span>';
       L.wq.innerHTML = s.q.length ? s.q.map(t => qchip(t, 'wait')).join('') : '<span class="qnone">nobody</span>';
+      const woke = S.threads.filter(t => t.woken === n && t.state === 'ready');
+      L.wk.innerHTML = woke.length ? woke.map(t => qchip(t, 'woke') + '<span class="wk-note">must retry sem_wait</span>').join('') : '<span class="qnone">nobody</span>';
+      L.log.innerHTML = s.log.length
+        ? s.log.map((e, i) => `<div class="${i === s.log.length - 1 ? 'new' : ''}">${e.tag ? `<span class="stepn">step ${e.tag}/2</span>` : ''}<b style="color:${e.th.color}">${esc(e.th.short)}</b> ${esc(e.text)}</div>`).join('')
+        : '<div class="qnone">no operations yet</div>';
     }
 
     /* thread cards */
@@ -942,14 +971,15 @@ function mountDemo(def) {
       const c = cards[th.id];
       c.el.classList.toggle('oncpu', th === run);
       c.el.classList.toggle('done', th.state === 'done');
-      c.st.className = 'st ' + (th === run ? 'running' : th.state);
+      c.st.className = 'st ' + (th === run ? 'running' : th.state === 'ready' && th.woken ? 'woken' : th.state);
       c.st.innerHTML = th === run ? 'on CPU' : (th.state === 'blocked' ? MINI_LOCK + ' ' : '') + STATE_TXT(th);
       c.btn.disabled = !live || th.state !== 'ready';
-      for (const ln in c.lineEl) { const x = c.lineEl[ln]; x.classList.remove('cur', 'blocked', 'ran'); x.firstChild.textContent = ''; }
+      for (const ln in c.lineEl) { const x = c.lineEl[ln]; x.classList.remove('cur', 'blocked', 'ran', 'woken'); x.firstChild.textContent = ''; }
       if (th.state !== 'done') {
         const x = c.lineEl[th.prog[th.pc].line];
         x.classList.add('cur'); if (th.state === 'blocked') x.classList.add('blocked');
-        x.firstChild.innerHTML = th.state === 'blocked' ? MINI_LOCK : th.state === 'sleep' ? 'z' : '▶';
+        x.firstChild.innerHTML = th.state === 'blocked' ? MINI_LOCK : th.state === 'sleep' ? 'z' : th.woken ? '↻' : '▶';
+        if (th.woken && th.state === 'ready') x.classList.add('woken');
       }
       if (S.last && S.last.th === th && c.lineEl[S.last.line]) c.lineEl[S.last.line].classList.add('ran');
       c.ctx.textContent = th.state === 'done' ? 'finished' : th === run ? 'context loaded in the CPU' : 'saved context: ' + ctxStr(th);
@@ -966,6 +996,7 @@ function mountDemo(def) {
     if (animate && last) {
       if (S.loaded) fly(cards[last.id].head, cpu.slot, last);
       if (S.ev && S.ev.k === 'block') fly(cpu.slot, lockEls[S.ev.sem].wq, last);
+      if (S.ev && S.ev.k === 'retry') fly(cpu.slot, lockEls[S.ev.sem].el, last);
       if (S.ev && S.ev.k === 'wake') fly(lockEls[S.ev.sem].el, cards[S.ev.who.id].head, S.ev.who);
     }
   }
