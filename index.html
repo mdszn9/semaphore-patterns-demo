@@ -420,7 +420,7 @@ footer { padding: 40px 0 60px; color: var(--muted); font-size: 14px; border-top:
   <p class="lede">Each program below runs on a simulated single CPU. You can watch the threads take turns on the processor, follow each thread's program counter through its code, and see them block on and wake from semaphore locks. Press Run to let the scheduler decide, or press a thread's "Run next line" button to schedule it yourself. Every demo also has a broken version so you can see what the semaphore is preventing.</p>
   <div class="hero-strip">
     <div class="hero-card"><b class="mono">sem_wait</b><span>If the value is above 0, decrement it and continue. If it is 0, block until someone posts.</span></div>
-    <div class="hero-card"><b class="mono">sem_post</b><span>If a thread is blocked, wake one up. Otherwise increment the value.</span></div>
+    <div class="hero-card"><b class="mono">sem_post</b><span>Increment the value, which unlocks the lock. If a thread is blocked, wake one so it can retry its <code>sem_wait</code>.</span></div>
     <div class="hero-card"><b>Initial value</b><span>Choosing the starting count picks the pattern: 0 signals, 1 is a lock, N limits how many run at once.</span></div>
   </div>
 </div>
@@ -438,9 +438,10 @@ footer { padding: 40px 0 60px; color: var(--muted); font-size: 14px; border-top:
   <span class="kw">else</span> block this thread on s.queue;
 
 <span class="fn">sem_post</span>(s):            <span class="cm">/* a.k.a. V, up, release */</span>
+  s.value++;               <span class="cm">/* the lock opens */</span>
   <span class="kw">if</span> (s.queue not empty) wake one thread;
-  <span class="kw">else</span> s.value++;</pre>
-      <p style="font-size:14px;color:var(--muted);margin:12px 0 0">Each step runs atomically, so no two threads can both see value 1 and both decrement it. The simulator hands the woken thread straight through its <code>sem_wait</code>. POSIX instead increments the value and lets the woken thread decrement it, which ends up in the same state.</p>
+                         <span class="cm">/* it retries sem_wait */</span></pre>
+      <p style="font-size:14px;color:var(--muted);margin:12px 0 0">Each step runs atomically, so no two threads can both see value 1 and both decrement it. As in POSIX, a woken thread does not get through immediately. It moves to the ready queue, and when it next runs it repeats <code>sem_wait</code>, taking the unit and locking the lock again.</p>
     </div>
     <div class="panel">
       <h3>Five patterns, five starting values</h3>
@@ -641,9 +642,15 @@ function exec(S, th) {
   switch (ins.op) {
     case 'wait': {
       const s = S.sems[ins.sem];
-      if (s.v > 0) { s.v--; s.holders.push(th); advance(th, ins); msg = `${th.name} calls sem_wait(&${s.name}): ${s.v + 1} → ${s.v}, and keeps going.`; }
+      if (s.v > 0) {
+        s.v--; s.holders.push(th); advance(th, ins);
+        msg = th.woken
+          ? `${th.name} is back on the CPU and retries sem_wait(&${s.name}): ${s.v + 1} → ${s.v}, so it takes the unit and gets through.`
+          : `${th.name} calls sem_wait(&${s.name}): ${s.v + 1} → ${s.v}, and keeps going.`;
+        th.woken = false;
+      }
       else {
-        th.state = 'blocked'; th.blockedOn = s.name; s.q.push(th); S.ev = { k: 'block', sem: s.name };
+        th.state = 'blocked'; th.blockedOn = s.name; th.woken = false; s.q.push(th); S.ev = { k: 'block', sem: s.name };
         msg = `${th.name} calls sem_wait(&${s.name}), but it is 0, so ${th.name} blocks and leaves the CPU.`;
       }
       break;
@@ -651,11 +658,14 @@ function exec(S, th) {
     case 'post': {
       const s = S.sems[ins.sem];
       const h = s.holders.indexOf(th); if (h >= 0) s.holders.splice(h, 1);
+      s.v++;
+      msg = `${th.name} calls sem_post(&${s.name}): ${s.v - 1} → ${s.v}, so ${s.name} is unlocked.`;
       if (s.q.length) {
-        const w = s.q.shift(); w.state = 'ready'; w.blockedOn = null; advance(w, w.prog[w.pc]); s.holders.push(w);
+        // like POSIX: the woken thread stays on its sem_wait line and retries it when it next runs
+        const w = s.q.shift(); w.state = 'ready'; w.blockedOn = null; w.woken = true;
         S.ev = { k: 'wake', sem: s.name, who: w };
-        msg = `${th.name} calls sem_post(&${s.name}). ${w.name} was blocked on it, so ${w.name} wakes, passes its sem_wait and joins the ready queue.`;
-      } else { s.v++; msg = `${th.name} calls sem_post(&${s.name}): ${s.v - 1} → ${s.v}.`; }
+        msg += ` ${w.name} was blocked on it, so it wakes up and joins the ready queue. It will retry sem_wait when it next runs.`;
+      }
       advance(th, ins);
       break;
     }
